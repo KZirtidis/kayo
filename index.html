@@ -409,8 +409,8 @@
       text-transform: uppercase;
     }
     .tool-grid {
-      display: grid; grid-template-columns: repeat(2,1fr);
-      gap: 14px; max-width: 620px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr;
+      gap: 14px; max-width: 340px; margin: 0 auto;
     }
     .tool-card {
       background: var(--navy-glass);
@@ -463,9 +463,6 @@
   <ul>
     <li><div class="tools-section-label">Tools</div></li>
     <li><a href="./ad-request/index.html">&#128203; Ad Request</a></li>
-    <li><a href="./sales-demand-tower/index.html">&#128202; Sales Demand Tower</a></li>
-    <li><a href="./supply/index.html">&#127981; Supply Tower</a></li>
-    <li><a href="./supply/planting-schedule/index.html">&#127807; Planting Schedule</a></li>
     <li class="featured has-sub">
       <a href="#" onclick="toggleSubMenu(event)">
         Administration
@@ -497,21 +494,6 @@
         <div class="tool-icon">📋</div>
         <div class="tool-name">Ad Request</div>
         <div class="tool-desc">Promotional ad approval workflow — Sales → Supply → Freight → Performance</div>
-      </a>
-      <a class="tool-card" href="./sales-demand-tower/index.html">
-        <div class="tool-icon">📊</div>
-        <div class="tool-name">Sales Demand Tower</div>
-        <div class="tool-desc">Retailer forecasting, demand planning &amp; SKU-level analysis</div>
-      </a>
-      <a class="tool-card" href="./supply/index.html">
-        <div class="tool-icon">🏭</div>
-        <div class="tool-name">Supply Tower</div>
-        <div class="tool-desc">Raw material forecasting, BOM requirements &amp; weekly supply views</div>
-      </a>
-      <a class="tool-card" href="./supply/planting-schedule/index.html">
-        <div class="tool-icon">🌱</div>
-        <div class="tool-name">Planting Schedule</div>
-        <div class="tool-desc">Growing season planning, field tracking &amp; harvest timelines</div>
       </a>
     </div>
   </div>

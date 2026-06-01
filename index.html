@@ -52,6 +52,7 @@
     #site-navigation .container {
       width: 100%; padding: 0 32px 0 20px;
       display: flex; align-items: center; justify-content: space-between;
+      position: relative;
     }
     .custom-logo { height: 85px; width: auto; display: block; }
 
@@ -447,6 +448,10 @@
     <button id="hamburger" aria-label="Open menu">
       <span></span><span></span><span></span>
     </button>
+    <a href="#" onclick="showHero(); return false;" style="position:absolute;left:50%;transform:translateX(-50%);text-decoration:none;display:flex;flex-direction:column;align-items:center;line-height:1.2;">
+      <span style="font-family:'Montserrat',sans-serif;font-size:19px;font-weight:700;color:#fff;letter-spacing:0.04em;">Pero Central</span>
+      <span style="font-family:'Montserrat',sans-serif;font-size:9px;font-weight:600;color:rgba(255,255,255,0.55);letter-spacing:0.14em;text-transform:uppercase;margin-top:2px;">Internal Operations Platform</span>
+    </a>
     <div class="theme-logo">
       <a href="#" onclick="showHero(); return false;">
         <img class="custom-logo"
@@ -487,8 +492,6 @@
     <img class="cloud" src="https://www.perofamilyfarms.com/wp-content/uploads/2022/10/cloud-5.png" alt=""/>
   </div>
   <div class="hero-content">
-    <div class="hero-tagline">Pero Central</div>
-    <div class="hero-sub">Internal Operations Platform</div>
     <div class="tool-grid">
       <a class="tool-card" href="./ad-request/index.html">
         <div class="tool-icon">📋</div>

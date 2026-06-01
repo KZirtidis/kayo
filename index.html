@@ -1,0 +1,1041 @@
+﻿
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pero Central</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://kit.fontawesome.com/6da7181ff0.css" crossorigin="anonymous"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* Farm background always visible */
+    html, body {
+      font-family: 'Montserrat', sans-serif;
+      overflow-x: hidden;
+      height: 100%;
+      background:
+        url('https://www.perofamilyfarms.com/wp-content/themes/pero-family-farms/images/pero-farm-footer-bg.jpg')
+        center top / cover no-repeat fixed;
+    }
+    body { padding-top: 97px; }
+
+    /* Color tokens (Pero navy palette) */
+    :root {
+      --navy:        #1d3b69;
+      --navy-dark:   #16305a;
+      --navy-glass:  rgba(29, 59, 105, 0.88);
+      --navy-card:   rgba(29, 59, 105, 0.60);
+      --navy-input:  rgba(20, 44, 84, 0.80);
+      --navy-active: rgba(255, 255, 255, 0.14);
+      --border:      rgba(255, 255, 255, 0.20);
+      --border-light:rgba(255, 255, 255, 0.12);
+      --text:        #f0f6ff;
+      --label:       #e2eeff;
+      --muted:       rgba(255, 255, 255, 0.55);
+      --gold:        #f5c518;
+      --green:       #4ade80;
+      --red:         #f87171;
+      --accent:      #60a5fa;
+      --blur:        blur(14px);
+    }
+
+    /* NAV */
+    #site-navigation {
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      width: 100%; position: fixed; top: 0; left: 0; z-index: 100;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.35);
+    }
+    #site-navigation .container {
+      width: 100%; padding: 0 32px 0 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .custom-logo { height: 85px; width: auto; display: block; }
+
+    /* HAMBURGER */
+    #hamburger {
+      background: none; border: none; cursor: pointer;
+      padding: 8px; display: flex; flex-direction: column;
+      gap: 6px; z-index: 200;
+    }
+    #hamburger span {
+      display: block; width: 28px; height: 3px;
+      background: #fff; border-radius: 2px; transition: all 0.3s ease;
+    }
+    #hamburger.open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
+    #hamburger.open span:nth-child(2) { opacity: 0; }
+    #hamburger.open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
+
+    /* DRAWER */
+    #drawer {
+      position: fixed; top: 0; left: -320px;
+      width: 300px; height: 100vh;
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      z-index: 999;
+      transition: left 0.35s ease;
+      padding: 100px 40px 40px;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+    }
+    #drawer.open { left: 0; }
+    #drawer ul { list-style: none; }
+    #drawer ul li { border-bottom: 1px solid var(--border); }
+    #drawer ul li a {
+      display: block; padding: 16px 0;
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      text-decoration: none; color: #fff;
+      font-family: 'Montserrat', sans-serif; transition: color 0.2s;
+    }
+    #drawer ul li a:hover    { color: var(--gold); }
+    #drawer ul li.featured > a { color: var(--gold); }
+
+    /* sub-arrow */
+    .sub-arrow {
+      float: right; font-size: 11px;
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+    .sub-arrow.open { transform: rotate(90deg); }
+
+    /* sub-menu */
+    .sub-menu {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      padding-left: 12px;
+    }
+    .sub-menu.open { max-height: 300px; }
+    .sub-menu li { border-bottom: none; }
+    .sub-menu li a {
+      padding: 10px 0 10px 8px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.75);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-left: 2px solid rgba(255,255,255,0.15);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .sub-menu li a:hover {
+      color: #fff;
+      border-left-color: var(--gold);
+    }
+
+    /* OVERLAY */
+    #drawer-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 998;
+    }
+    #drawer-overlay.open { display: block; }
+
+    /* HERO — fully transparent, zero border, farm bleeds through */
+    #hero-banner {
+      width: 100%; height: calc(100vh - 97px); min-height: 500px;
+      position: relative;
+      background: transparent;
+      border: none; outline: none; box-shadow: none;
+    }
+    .clouds { position: absolute; inset: 0; pointer-events: none; }
+    .clouds img.cloud { position: absolute; }
+    .clouds img.cloud:nth-child(1) { top: 5%;  left: 2%;  width: 28%; }
+    .clouds img.cloud:nth-child(2) { top: 2%;  left: 38%; width: 32%; }
+    .clouds img.cloud:nth-child(3) { top: 10%; left: 68%; width: 18%; }
+    .clouds img.cloud:nth-child(4) { top: 18%; left: 80%; width: 16%; }
+    .hero-content {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      text-align: center; z-index: 10; width: 80%;
+    }
+
+    /* ADMIN SECTION */
+    #admin-section {
+      display: none;
+      min-height: calc(100vh - 97px);
+      background: transparent;
+    }
+
+    /* Admin Sidebar */
+    .adm-sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      min-height: calc(100vh - 97px);
+    }
+    .adm-brand {
+      display: block; text-decoration: none;
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .adm-brand:hover { background: var(--navy-active); }
+    .adm-brand .brand-name { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+    .adm-brand .brand-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .adm-nav { padding: 12px 8px; flex: 1; }
+    .adm-nav-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 8px 10px 4px;
+    }
+    .adm-nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: 7px; cursor: pointer;
+      font-size: 13px; color: #fff;
+      transition: background 0.15s, color 0.15s;
+      margin-bottom: 2px; font-family: 'Montserrat', sans-serif;
+    }
+    .adm-nav-item:hover  { background: var(--navy-active); }
+    .adm-nav-item.active { background: var(--navy-active); border-left: 3px solid var(--gold); padding-left: 7px; }
+    .adm-nav-icon { font-size: 15px; width: 20px; text-align: center; }
+    .adm-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.12); border: 1px solid var(--border);
+      border-radius: 99px; font-size: 10px; color: #fff;
+      padding: 1px 7px;
+    }
+
+    /* Admin Main */
+    .adm-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: calc(100vh - 97px); }
+
+    .adm-topbar {
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+    }
+    .adm-topbar-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .adm-topbar-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .adm-back {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: #fff; cursor: pointer;
+      padding: 6px 14px; border-radius: 7px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.10);
+      font-family: 'Montserrat', sans-serif;
+      transition: all 0.15s; text-decoration: none;
+    }
+    .adm-back:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); }
+
+    .adm-content {
+      flex: 1; overflow-y: auto; padding: 28px;
+      background: transparent;
+    }
+
+    /* Sections */
+    .adm-section { display: none; }
+    .adm-section.active { display: block; }
+
+    /* Cards — white frosted glass body, dark navy header strip */
+    .adm-card {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(29, 59, 105, 0.18);
+      border-radius: 10px; overflow: hidden; margin-bottom: 24px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.18);
+    }
+    .adm-card-header {
+      padding: 14px 20px; border-bottom: 1px solid rgba(29,59,105,0.15);
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(29, 59, 105, 0.88);
+    }
+    .adm-card-title { font-size: 14px; font-weight: 700; color: #fff; }
+    .adm-card-sub   { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+
+    /* Table */
+    .adm-table { width: 100%; border-collapse: collapse; }
+    .adm-table th {
+      text-align: center; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #fff; padding: 10px 20px;
+      border-bottom: 1px solid rgba(29,59,105,0.25);
+      border-right: 1px solid rgba(255,255,255,0.18);
+      background: rgba(29, 59, 105, 0.82);
+    }
+    .adm-table th:last-child { border-right: none; }
+    .adm-table td {
+      padding: 12px 20px; font-size: 13px; color: #0f2347; font-weight: 500;
+      border-bottom: 1px solid rgba(29,59,105,0.10);
+      border-right: 1px solid rgba(29,59,105,0.10);
+    }
+    .adm-table td:last-child { border-right: none; }
+    .adm-table tr:last-child td { border-bottom: none; }
+    .adm-table tr:hover td { background: rgba(29,59,105,0.06); }
+    .adm-table td .t-name  { color: #0a1d3e; font-weight: 700; }
+    .adm-table td .t-email { color: #111827; font-size: 12px; }
+
+    /* Badges */
+    .adm-badge-pill {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-green { background: rgba(22,163,74,0.12);  color: #14532d; border: 1px solid rgba(22,163,74,0.35); }
+    .badge-red   { background: rgba(220,38,38,0.10);  color: #7f1d1d; border: 1px solid rgba(220,38,38,0.30); }
+    .badge-blue  { background: rgba(29,59,105,0.12);  color: #1d3b69; border: 1px solid rgba(29,59,105,0.30); }
+
+    /* Buttons */
+    .adm-btn {
+      padding: 8px 16px; border-radius: 7px; font-size: 13px;
+      font-weight: 600; border: none; cursor: pointer;
+      transition: all 0.15s; font-family: 'Montserrat', sans-serif;
+    }
+    .adm-btn-primary { background: var(--gold); color: var(--navy-dark); }
+    .adm-btn-primary:hover { background: #ffd94d; }
+    .adm-btn-ghost {
+      background: rgba(29,59,105,0.08); color: #1d3b69;
+      border: 1px solid rgba(29,59,105,0.30);
+    }
+    .adm-btn-ghost:hover { background: rgba(29,59,105,0.16); color: #0a1d3e; border-color: rgba(29,59,105,0.50); }
+    .adm-btn-danger {
+      background: rgba(248,113,113,0.18); color: #ffa0a0;
+      border: 1px solid rgba(248,113,113,0.4);
+    }
+    .adm-btn-danger:hover { background: rgba(248,113,113,0.32); }
+    .adm-btn-sm { padding: 5px 11px; font-size: 12px; }
+
+    /* Form */
+    .adm-form-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; padding: 20px;
+    }
+    .adm-form-group { display: flex; flex-direction: column; gap: 6px; }
+    .adm-form-group.span-2 { grid-column: span 2; }
+    .adm-form-grid label { font-size: 12px; font-weight: 700; color: #0a1d3e; letter-spacing: 0.02em; }
+    .adm-form-grid input, .adm-form-grid select {
+      background: rgba(240, 246, 255, 0.95);
+      border: 1.5px solid rgba(29, 59, 105, 0.35);
+      border-radius: 7px; color: #0a1d3e; font-size: 13px; font-weight: 500;
+      padding: 10px 14px; outline: none;
+      font-family: 'Montserrat', sans-serif;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .adm-form-grid input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 2px rgba(29,59,105,0.18), inset 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .adm-form-grid input::placeholder { color: rgba(10,29,62,0.40); }
+
+    /* Access Matrix */
+    .adm-matrix-wrap { overflow-x: auto; }
+    .adm-matrix { width: 100%; border-collapse: collapse; }
+    .adm-matrix th {
+      text-align: center; font-size: 11px; font-weight: 700; color: #fff;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 10px 14px; border-bottom: 1px solid rgba(29,59,105,0.25);
+      border-right: 1px solid rgba(255,255,255,0.18);
+      white-space: nowrap;
+      background: rgba(29, 59, 105, 0.82);
+    }
+    .adm-matrix th:last-child { border-right: none; }
+    .adm-matrix th.area-col {
+      color: #ffd94d;
+      background: rgba(29, 59, 105, 0.90);
+    }
+    .adm-matrix td {
+      padding: 10px 14px; border-bottom: 1px solid rgba(29,59,105,0.10);
+      border-right: 1px solid rgba(29,59,105,0.10);
+      font-size: 13px; color: #0f2347; font-weight: 500;
+    }
+    .adm-matrix td:last-child { border-right: none; }
+    .adm-matrix td.area-cell { text-align: center; }
+    .adm-matrix tr:hover td { background: rgba(29,59,105,0.06); }
+    .adm-matrix tr:last-child td { border-bottom: none; }
+    .adm-matrix .u-name  { color: #0a1d3e; font-weight: 700; }
+    .adm-matrix .u-email { font-size: 11px; color: #111827; }
+
+    .access-toggle {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1.5px solid rgba(29,59,105,0.35);
+      background: rgba(240,246,255,0.80);
+      cursor: pointer; font-size: 15px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: all 0.15s; color: #1d3b69;
+    }
+    .access-toggle:hover { border-color: rgba(29,59,105,0.60); background: rgba(29,59,105,0.12); color: #0a1d3e; }
+    .access-toggle.granted {
+      background: rgba(22,163,74,0.15);
+      border-color: rgba(22,163,74,0.50); color: #14532d;
+    }
+    .access-toggle.granted:hover {
+      background: rgba(220,38,38,0.12);
+      border-color: rgba(220,38,38,0.45); color: #7f1d1d;
+    }
+
+    /* Empty */
+    .adm-empty { text-align: center; padding: 48px 20px; color: rgba(255,255,255,0.55); font-size: 13px; }
+    .adm-empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+    /* Toast */
+    #adm-toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 18px;
+      font-size: 13px; color: #fff;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 9999; pointer-events: none;
+      font-family: 'Montserrat', sans-serif;
+    }
+    #adm-toast.show { transform: translateY(0); opacity: 1; }
+    #adm-toast.success { border-color: rgba(74,222,128,0.55); }
+    #adm-toast.error   { border-color: rgba(248,113,113,0.55); }
+
+    /* HERO CONTENT — tagline + tool cards */
+    .hero-tagline {
+      font-size: 44px; font-weight: 700; color: #fff;
+      letter-spacing: 0.02em; margin-bottom: 8px;
+      text-shadow: 0 2px 24px rgba(0,0,0,0.45);
+    }
+    .hero-sub {
+      font-size: 15px; color: rgba(255,255,255,0.65);
+      margin-bottom: 40px; letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .tool-grid {
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 14px; max-width: 620px; margin: 0 auto;
+    }
+    .tool-card {
+      background: var(--navy-glass);
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 22px;
+      text-decoration: none; color: #fff;
+      display: flex; flex-direction: column; gap: 6px;
+      transition: all 0.2s ease; text-align: left;
+    }
+    .tool-card:hover {
+      background: rgba(29,59,105,0.97);
+      border-color: rgba(245,197,24,0.55);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.40);
+    }
+    .tool-icon { font-size: 26px; margin-bottom: 2px; }
+    .tool-name { font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: 0.02em; }
+    .tool-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+    /* DRAWER TOOLS SECTION */
+    #drawer .tools-section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: rgba(255,255,255,0.38);
+      padding: 18px 0 6px; border-top: 1px solid var(--border-light);
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="site-navigation">
+  <div class="container">
+    <button id="hamburger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="theme-logo">
+      <a href="#" onclick="showHero(); return false;">
+        <img class="custom-logo"
+             src="https://www.perofamilyfarms.com/wp-content/uploads/2022/01/logo.png"
+             alt="Pero Family Farms"/>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- DRAWER -->
+<div id="drawer-overlay"></div>
+<div id="drawer">
+  <ul>
+    <li><div class="tools-section-label">Tools</div></li>
+    <li><a href="./ad-request/index.html">&#128203; Ad Request</a></li>
+    <li><a href="./sales-demand-tower/index.html">&#128202; Sales Demand Tower</a></li>
+    <li><a href="./supply/index.html">&#127981; Supply Tower</a></li>
+    <li><a href="./supply/planting-schedule/index.html">&#127807; Planting Schedule</a></li>
+    <li class="featured has-sub">
+      <a href="#" onclick="toggleSubMenu(event)">
+        Administration
+        <span class="sub-arrow" id="sub-arrow">&#9658;</span>
+      </a>
+      <ul class="sub-menu" id="sub-menu">
+        <li><a href="#" onclick="showAdmin('users'); return false;"><i class="fa-solid fa-user-group" style="color:#ffd94d;"></i> Users</a></li>
+        <li><a href="#" onclick="showAdmin('pagegroups'); return false;">&#128508; Page Groups</a></li>
+        <li><a href="#" onclick="showAdmin('permissions'); return false;">&#129513; Page Permissions</a></li>
+        <li><a href="#" onclick="openReviewNotes('landing'); closeDrawer(); return false;">&#128203; Review Notes</a></li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<!-- HERO — fully transparent, farm visible -->
+<section id="hero-banner">
+  <div class="clouds">
+    <img class="cloud" src="https://www.perofamilyfarms.com/wp-content/uploads/2022/10/cloud-1.png" alt=""/>
+    <img class="cloud" src="https://www.perofamilyfarms.com/wp-content/uploads/2022/10/cloud-2.png" alt=""/>
+    <img class="cloud" src="https://www.perofamilyfarms.com/wp-content/uploads/2022/10/cloud-4.png" alt=""/>
+    <img class="cloud" src="https://www.perofamilyfarms.com/wp-content/uploads/2022/10/cloud-5.png" alt=""/>
+  </div>
+  <div class="hero-content">
+    <div class="hero-tagline">Pero Central</div>
+    <div class="hero-sub">Internal Operations Platform</div>
+    <div class="tool-grid">
+      <a class="tool-card" href="./ad-request/index.html">
+        <div class="tool-icon">📋</div>
+        <div class="tool-name">Ad Request</div>
+        <div class="tool-desc">Promotional ad approval workflow — Sales → Supply → Freight → Performance</div>
+      </a>
+      <a class="tool-card" href="./sales-demand-tower/index.html">
+        <div class="tool-icon">📊</div>
+        <div class="tool-name">Sales Demand Tower</div>
+        <div class="tool-desc">Retailer forecasting, demand planning &amp; SKU-level analysis</div>
+      </a>
+      <a class="tool-card" href="./supply/index.html">
+        <div class="tool-icon">🏭</div>
+        <div class="tool-name">Supply Tower</div>
+        <div class="tool-desc">Raw material forecasting, BOM requirements &amp; weekly supply views</div>
+      </a>
+      <a class="tool-card" href="./supply/planting-schedule/index.html">
+        <div class="tool-icon">🌱</div>
+        <div class="tool-name">Planting Schedule</div>
+        <div class="tool-desc">Growing season planning, field tracking &amp; harvest timelines</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN SECTION -->
+<div id="admin-section">
+
+  <!-- Sidebar -->
+  <div class="adm-sidebar">
+    <a class="adm-brand" href="#" onclick="showHero(); return false;">
+      <div class="brand-name"><img src="https://www.perofamilyfarms.com/wp-content/uploads/2022/01/logo-100x100.png" alt="Pero" style="height:24px;width:auto;vertical-align:middle;margin-right:2px;"> Pero Central</div>
+      <div class="brand-sub">Admin Panel</div>
+    </a>
+    <nav class="adm-nav">
+      <div class="adm-nav-label">Management</div>
+      <div class="adm-nav-item active" onclick="showAdmSection('users', this)">
+        <span class="adm-nav-icon" style="color:#ffd94d;"><i class="fa-solid fa-user-group"></i></span> Users
+        <span class="adm-badge" id="users-count">0</span>
+      </div>
+      <div class="adm-nav-item" onclick="showAdmSection('pagegroups', this)">
+        <span class="adm-nav-icon">&#128508;</span> Page Groups
+        <span class="adm-badge" id="pagegroups-count">0</span>
+      </div>
+      <div class="adm-nav-item" onclick="showAdmSection('permissions', this)">
+        <span class="adm-nav-icon">&#129513;</span> Page Permissions
+      </div>
+      <div class="adm-nav-item" onclick="openReviewNotes()">
+        <span class="adm-nav-icon">&#128203;</span> <span id="sidebar-review-label">Review Users</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Main -->
+  <div class="adm-main">
+    <div class="adm-topbar">
+      <div>
+        <div class="adm-topbar-title" id="adm-topbar-title">Users</div>
+        <div class="adm-topbar-sub"   id="adm-topbar-sub">Pero Central — User Management</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="review-notes-btn" class="adm-btn adm-btn-ghost" onclick="openReviewNotes()" style="display:flex;align-items:center;gap:6px;">&#128203; Review Users</button>
+        <button class="adm-back" onclick="showHero()">&#8592; Back to Home</button>
+      </div>
+    </div>
+
+    <div class="adm-content">
+
+      <!-- USERS -->
+      <div class="adm-section active" id="adm-section-users">
+        <div class="adm-card">
+          <div class="adm-card-header"><div class="adm-card-title">Add New User</div></div>
+          <form class="adm-form-grid" onsubmit="addUser(event)">
+            <div class="adm-form-group">
+              <label>Username</label>
+              <input id="u-username" type="text" placeholder="jsmith" required/>
+            </div>
+            <div class="adm-form-group">
+              <label>Email</label>
+              <input id="u-email" type="email" placeholder="j.smith@company.com" required/>
+            </div>
+            <div class="adm-form-group span-2">
+              <label>Password</label>
+              <input id="u-password" type="password" placeholder="Temporary password" required/>
+            </div>
+            <div class="adm-form-group span-2" style="flex-direction:row;gap:10px;margin-top:4px;">
+              <button type="submit" class="adm-btn adm-btn-primary">Add User</button>
+              <button type="button" class="adm-btn adm-btn-ghost" onclick="clearFields('u-username','u-email','u-password')">Clear</button>
+            </div>
+          </form>
+        </div>
+        <div class="adm-card">
+          <div class="adm-card-header"><div class="adm-card-title">All Users</div></div>
+          <div id="users-table-wrap">
+            <div class="adm-empty"><div class="adm-empty-icon">&#128100;</div>No users yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE GROUPS -->
+      <div class="adm-section" id="adm-section-pagegroups">
+        <div class="adm-card">
+          <div class="adm-card-header"><div class="adm-card-title">Add New Page Group</div></div>
+          <form class="adm-form-grid" onsubmit="addArea(event)">
+            <div class="adm-form-group">
+              <label>Page Group Name</label>
+              <input id="a-name" type="text" placeholder="e.g. Inventory, Sales Dashboard" required/>
+            </div>
+            <div class="adm-form-group">
+              <label>Sort Order</label>
+              <input id="a-sort" type="number" placeholder="1" min="1"/>
+            </div>
+            <div class="adm-form-group span-2">
+              <label>Description</label>
+              <input id="a-desc" type="text" placeholder="Brief description of this page group"/>
+            </div>
+            <div class="adm-form-group span-2" style="flex-direction:row;gap:10px;margin-top:4px;">
+              <button type="submit" class="adm-btn adm-btn-primary">Add Page Group</button>
+              <button type="button" class="adm-btn adm-btn-ghost" onclick="clearFields('a-name','a-sort','a-desc')">Clear</button>
+            </div>
+          </form>
+        </div>
+        <div class="adm-card">
+          <div class="adm-card-header"><div class="adm-card-title">All Page Groups</div></div>
+          <div id="pagegroups-table-wrap">
+            <div class="adm-empty"><div class="adm-empty-icon">&#128508;</div>No page groups yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PERMISSIONS -->
+      <div class="adm-section" id="adm-section-permissions">
+        <div class="adm-card" style="padding:16px 20px;display:flex;align-items:center;gap:12px;font-size:13px;color:#0f2347;">
+          <span style="font-size:18px;">&#128161;</span>
+          Click a cell to <span style="color:#15803d;font-weight:700;">grant</span> or <span style="color:#b91c1c;font-weight:700;">revoke</span> permissions. Changes save instantly.
+        </div>
+        <div class="adm-card">
+          <div class="adm-card-header">
+            <div class="adm-card-title">User &#8596; Page Permissions Matrix</div>
+            <div class="adm-card-sub" id="matrix-sub">-- users x -- page groups</div>
+          </div>
+          <div class="adm-matrix-wrap" id="access-matrix">
+            <div class="adm-empty"><div class="adm-empty-icon">&#129513;</div>Add users and page groups first.</div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+
+<!-- REVIEW NOTES MODAL -->
+<div id="review-overlay" onclick="closeReviewNotes()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.50);z-index:2000;"></div>
+<div id="review-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;width:500px;max-width:92vw;max-height:80vh;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.45);z-index:2001;font-family:'Montserrat',sans-serif;">
+  <div style="background:#1d3b69;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div>
+      <div id="review-modal-title" style="display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:#fff;">&#128203; Review Users</div>
+      <div id="review-modal-sub" style="font-size:11px;color:rgba(255,255,255,0.60);margin-top:3px;padding-left:2px;">Saving notes for: Users</div>
+    </div>
+    <button onclick="closeReviewNotes()" style="background:none;border:none;color:rgba(255,255,255,0.70);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">&#10005;</button>
+  </div>
+  <div id="review-notes-body" style="flex:1;overflow-y:auto;padding:20px 24px;min-height:140px;"></div>
+  <div style="padding:0 24px 16px;flex-shrink:0;">
+    <button onclick="addReviewBullet()" id="add-bullet-btn" style="width:100%;padding:12px;border:2px dashed #cbd5e1;border-radius:8px;background:none;color:#64748b;font-size:13px;cursor:pointer;font-family:'Montserrat',sans-serif;">+ Add Bullet</button>
+  </div>
+  <div style="padding:12px 24px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">
+    <button class="adm-btn adm-btn-ghost" onclick="closeReviewNotes()">Close</button>
+    <button class="adm-btn adm-btn-primary" onclick="saveReviewNotes()">Save</button>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-overlay" onclick="closeConfirm()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;"></div>
+<div id="confirm-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;width:420px;max-width:92vw;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.50);z-index:3001;font-family:'Montserrat',sans-serif;">
+  <div style="background:#1d3b69;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div id="confirm-title" style="font-size:15px;font-weight:700;color:#fff;">Confirm Action</div>
+    <button onclick="closeConfirm()" style="background:none;border:none;color:rgba(255,255,255,0.70);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">&#10005;</button>
+  </div>
+  <div style="padding:24px 24px 16px;flex-shrink:0;">
+    <p id="confirm-message" style="font-size:13px;color:#0f2347;margin-bottom:20px;line-height:1.6;"></p>
+    <p style="font-size:12px;color:#475569;margin-bottom:8px;">Type <strong id="confirm-word-display" style="color:#1d3b69;"></strong> to confirm:</p>
+    <input id="confirm-input" type="text" oninput="checkConfirmWord()"
+      style="width:100%;border:1.5px solid rgba(29,59,105,0.35);border-radius:7px;padding:10px 14px;font-size:13px;color:#0a1d3e;font-family:'Montserrat',sans-serif;outline:none;background:rgba(240,246,255,0.95);"
+      placeholder="Type to confirm..."/>
+  </div>
+  <div style="padding:12px 24px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px;">
+    <button class="adm-btn adm-btn-ghost" onclick="closeConfirm()">Cancel</button>
+    <button id="confirm-btn" class="adm-btn adm-btn-danger" onclick="executeConfirm()" disabled style="opacity:0.4;cursor:not-allowed;">Confirm</button>
+  </div>
+</div>
+
+<div id="adm-toast"></div>
+
+<script>
+  // Page switching
+  var hero  = document.getElementById('hero-banner');
+  var admin = document.getElementById('admin-section');
+
+  function showHero() {
+    hero.style.display  = 'block';
+    admin.style.display = 'none';
+    closeDrawer();
+  }
+  function showAdmin(section) {
+    hero.style.display  = 'none';
+    admin.style.display = 'flex';
+    closeDrawer();
+    var el = document.querySelector('.adm-nav-item[onclick*="' + section + '"]');
+    showAdmSection(section, el);
+  }
+  function toggleSubMenu(e) {
+    e.preventDefault();
+    var sub   = document.getElementById('sub-menu');
+    var arrow = document.getElementById('sub-arrow');
+    sub.classList.toggle('open');
+    arrow.classList.toggle('open');
+  }
+
+  // Drawer
+  var hamburger = document.getElementById('hamburger');
+  var drawer    = document.getElementById('drawer');
+  var overlay   = document.getElementById('drawer-overlay');
+  function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('open'); hamburger.classList.add('open'); }
+  function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('open'); hamburger.classList.remove('open'); }
+  hamburger.addEventListener('click', function() { drawer.classList.contains('open') ? closeDrawer() : openDrawer(); });
+  overlay.addEventListener('click', closeDrawer);
+
+  // Admin nav
+  function showAdmSection(name, el) {
+    currentSection = name;
+    var rnBtn = document.getElementById('review-notes-btn');
+    if (rnBtn) { rnBtn.innerHTML = '&#128203; Review ' + (sectionLabels[name] || name); }
+    var rnSidebar = document.getElementById('sidebar-review-label');
+    if (rnSidebar) { rnSidebar.textContent = 'Review ' + (sectionLabels[name] || name); }
+    document.querySelectorAll('.adm-section').forEach(function(s) { s.classList.remove('active'); });
+    document.querySelectorAll('.adm-nav-item').forEach(function(n) { n.classList.remove('active'); });
+    document.getElementById('adm-section-' + name).classList.add('active');
+    if (el) { el.classList.add('active'); }
+    var titles = {
+      users:       ['Users',            'Pero Central — User Management'],
+      pagegroups:  ['Page Groups',      'Pero Central — Page Groups'],
+      permissions: ['Page Permissions', 'Pero Central — Page Permissions']
+    };
+    document.getElementById('adm-topbar-title').textContent = titles[name][0];
+    document.getElementById('adm-topbar-sub').textContent   = titles[name][1];
+    if (name === 'permissions') { renderMatrix(); }
+  }
+
+  // State
+  var users = [], areas = [], access = [];
+  var nextUserId = 1, nextAreaId = 1;
+
+  // Users
+  function addUser(e) {
+    e.preventDefault();
+    var username = document.getElementById('u-username').value.trim();
+    var email    = document.getElementById('u-email').value.trim();
+    var password = document.getElementById('u-password').value;
+    if (users.find(function(u) { return u.username === username; })) { toast('Username already exists', 'error'); return; }
+    if (users.find(function(u) { return u.email === email; }))       { toast('Email already in use', 'error'); return; }
+    users.push({ id: nextUserId++, username: username, email: email, isActive: true, createdAt: new Date() });
+    updateCounts(); renderUsersTable();
+    clearFields('u-username','u-email','u-password');
+    toast('User "' + username + '" added', 'success');
+  }
+  function toggleUser(id) {
+    var u = users.find(function(u) { return u.id === id; }); if (!u) return;
+    u.isActive = !u.isActive;
+    renderUsersTable(); renderMatrix();
+    toast('User "' + u.username + '" ' + (u.isActive ? 'activated' : 'deactivated'), 'success');
+  }
+  function deleteUser(id) {
+    var u = users.find(function(u) { return u.id === id; }); if (!u) return;
+    users  = users.filter(function(x) { return x.id !== id; });
+    access = access.filter(function(a) { return a.userId !== id; });
+    updateCounts(); renderUsersTable(); renderMatrix();
+    toast('User "' + u.username + '" deleted', 'success');
+  }
+  function renderUsersTable() {
+    var wrap = document.getElementById('users-table-wrap');
+    if (!users.length) { wrap.innerHTML = '<div class="adm-empty"><div class="adm-empty-icon">&#128100;</div>No users yet.</div>'; return; }
+    var rows = users.map(function(u) {
+      var cnt = access.filter(function(a) { return a.userId === u.id; }).length;
+      return '<tr>' +
+        '<td><div class="t-name">' + u.username + '</div></td>' +
+        '<td><div class="t-email">' + u.email + '</div></td>' +
+        '<td>' + u.createdAt.toLocaleDateString() + '</td>' +
+        '<td><span class="adm-badge-pill ' + (u.isActive ? 'badge-green' : 'badge-red') + '">' + (u.isActive ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td>' + cnt + ' page group(s)</td>' +
+        '<td style="display:flex;gap:6px;">' +
+          '<button class="adm-btn adm-btn-ghost adm-btn-sm" onclick="confirmToggleUser(' + u.id + ')">' + (u.isActive ? 'Deactivate' : 'Activate') + '</button>' +
+          '<button class="adm-btn adm-btn-danger adm-btn-sm" onclick="confirmDeleteUser(' + u.id + ')">Delete</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table class="adm-table"><thead><tr>' +
+      '<th>Username</th><th>Email</th><th>Created</th><th>Status</th><th>Permissions</th><th>Actions</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  // Areas
+  function addArea(e) {
+    e.preventDefault();
+    var name = document.getElementById('a-name').value.trim();
+    var desc = document.getElementById('a-desc').value.trim();
+    var sort = parseInt(document.getElementById('a-sort').value) || areas.length + 1;
+    if (areas.find(function(a) { return a.name.toLowerCase() === name.toLowerCase(); })) { toast('Page group already exists', 'error'); return; }
+    areas.push({ id: nextAreaId++, name: name, description: desc, isActive: true, sortOrder: sort, createdAt: new Date() });
+    areas.sort(function(a,b) { return a.sortOrder - b.sortOrder; });
+    updateCounts(); renderAreasTable();
+    clearFields('a-name','a-sort','a-desc');
+    toast('Page group "' + name + '" added', 'success');
+  }
+  function toggleArea(id) {
+    var a = areas.find(function(a) { return a.id === id; }); if (!a) return;
+    a.isActive = !a.isActive;
+    renderAreasTable(); renderMatrix();
+    toast('Page group "' + a.name + '" ' + (a.isActive ? 'activated' : 'deactivated'), 'success');
+  }
+  function deleteArea(id) {
+    var a = areas.find(function(a) { return a.id === id; }); if (!a) return;
+    areas  = areas.filter(function(x) { return x.id !== id; });
+    access = access.filter(function(ac) { return ac.areaId !== id; });
+    updateCounts(); renderAreasTable(); renderMatrix();
+    toast('Page group "' + a.name + '" deleted', 'success');
+  }
+  function renderAreasTable() {
+    var wrap = document.getElementById('pagegroups-table-wrap');
+    if (!areas.length) { wrap.innerHTML = '<div class="adm-empty"><div class="adm-empty-icon">&#128508;</div>No page groups yet.</div>'; return; }
+    var rows = areas.map(function(a) {
+      var cnt = access.filter(function(ac) { return ac.areaId === a.id; }).length;
+      return '<tr>' +
+        '<td><div class="t-name">' + a.name + '</div></td>' +
+        '<td>' + (a.description || '<span style="color:rgba(255,255,255,0.40)">--</span>') + '</td>' +
+        '<td>' + a.sortOrder + '</td>' +
+        '<td><span class="adm-badge-pill ' + (a.isActive ? 'badge-green' : 'badge-red') + '">' + (a.isActive ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td>' + cnt + ' user(s)</td>' +
+        '<td style="display:flex;gap:6px;">' +
+          '<button class="adm-btn adm-btn-ghost adm-btn-sm" onclick="confirmToggleArea(' + a.id + ')">' + (a.isActive ? 'Deactivate' : 'Activate') + '</button>' +
+          '<button class="adm-btn adm-btn-danger adm-btn-sm" onclick="confirmDeleteArea(' + a.id + ')">Delete</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table class="adm-table"><thead><tr>' +
+      '<th>Page Group Name</th><th>Description</th><th>Order</th><th>Status</th><th>Users</th><th>Actions</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  // Access Matrix
+  function hasAccess(userId, areaId) { return access.some(function(a) { return a.userId === userId && a.areaId === areaId; }); }
+  function toggleAccess(userId, areaId) {
+    var u = users.find(function(u) { return u.id === userId; });
+    var a = areas.find(function(a) { return a.id === areaId; });
+    if (!u || !a) return;
+    if (hasAccess(userId, areaId)) {
+      access = access.filter(function(ac) { return !(ac.userId === userId && ac.areaId === areaId); });
+      toast('Permission removed: ' + u.username + ' → ' + a.name, 'success');
+    } else {
+      access.push({ userId: userId, areaId: areaId, grantedAt: new Date() });
+      toast('Permission granted: ' + u.username + ' → ' + a.name, 'success');
+    }
+    updateCounts(); renderMatrix();
+  }
+  function renderMatrix() {
+    var wrap = document.getElementById('access-matrix');
+    document.getElementById('matrix-sub').textContent = users.length + ' user(s) x ' + areas.length + ' page group(s)';
+    if (!users.length || !areas.length) {
+      wrap.innerHTML = '<div class="adm-empty"><div class="adm-empty-icon">&#129513;</div>Add users and page groups first.</div>';
+      return;
+    }
+    var cols = areas.map(function(a) { return '<th class="area-col">' + a.name + '</th>'; }).join('');
+    var rows = users.map(function(u) {
+      var cells = areas.map(function(a) {
+        var g = hasAccess(u.id, a.id);
+        return '<td class="area-cell"><button class="access-toggle ' + (g ? 'granted' : '') + '" onclick="toggleAccess(' + u.id + ',' + a.id + ')">' + (g ? '&#10003;' : '+') + '</button></td>';
+      }).join('');
+      var cnt = access.filter(function(ac) { return ac.userId === u.id; }).length;
+      return '<tr>' +
+        '<td><div class="u-name">' + u.username + '</div><div class="u-email">' + u.email + '</div></td>' +
+        '<td><span class="adm-badge-pill badge-blue">' + cnt + ' page group(s)</span></td>' +
+        cells +
+      '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table class="adm-matrix"><thead><tr><th>User</th><th>Permissions</th>' + cols + '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  // Review Notes (per-section)
+  var currentSection = 'users';
+  var reviewNotesBySection = {};
+  var activeReviewSection = 'users';
+  try { reviewNotesBySection = JSON.parse(sessionStorage.getItem('pero-review-notes') || '{}'); } catch(e) {}
+
+  var sectionLabels = { landing: 'Landing Page', users: 'Users', pagegroups: 'Page Groups', permissions: 'Page Permissions' };
+
+  function openReviewNotes(section) {
+    activeReviewSection = section || currentSection;
+    var notes = reviewNotesBySection[activeReviewSection] || [];
+    reviewNotesBySection[activeReviewSection] = notes;
+    var titleEl = document.getElementById('review-modal-title');
+    if (titleEl) { titleEl.innerHTML = '&#128203; Review ' + (sectionLabels[activeReviewSection] || activeReviewSection); }
+    var sub = document.getElementById('review-modal-sub');
+    if (sub) { sub.textContent = 'Saving notes for: ' + (sectionLabels[activeReviewSection] || activeReviewSection); }
+    renderNotesBody();
+    document.getElementById('review-overlay').style.display = 'block';
+    document.getElementById('review-modal').style.display   = 'flex';
+  }
+  function closeReviewNotes() {
+    document.getElementById('review-overlay').style.display = 'none';
+    document.getElementById('review-modal').style.display   = 'none';
+  }
+  function addReviewBullet() {
+    if (!reviewNotesBySection[activeReviewSection]) { reviewNotesBySection[activeReviewSection] = []; }
+    reviewNotesBySection[activeReviewSection].push('');
+    renderNotesBody();
+    var inputs = document.getElementById('review-notes-body').querySelectorAll('input');
+    if (inputs.length) { inputs[inputs.length - 1].focus(); }
+  }
+  function deleteReviewBullet(i) {
+    reviewNotesBySection[activeReviewSection].splice(i, 1);
+    renderNotesBody();
+  }
+  function renderNotesBody() {
+    var notes = reviewNotesBySection[activeReviewSection] || [];
+    var body = document.getElementById('review-notes-body');
+    if (!notes.length) {
+      body.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:13px;padding:24px 0;">No notes yet. Click &quot;+ Add Bullet&quot; to start.</div>';
+      return;
+    }
+    body.innerHTML = notes.map(function(note, i) {
+      return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+        '<span style="color:#1d3b69;font-size:18px;line-height:1;flex-shrink:0;">&#8226;</span>' +
+        '<input type="text" value="' + note.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" ' +
+          'oninput="reviewNotesBySection[activeReviewSection][' + i + ']=this.value" ' +
+          'style="flex:1;border:none;border-bottom:1.5px solid #e2e8f0;padding:6px 2px;font-size:13px;color:#0f2347;font-family:\'Montserrat\',sans-serif;outline:none;background:none;" ' +
+          'placeholder="Add a note..."/>' +
+        '<button onclick="deleteReviewBullet(' + i + ')" ' +
+          'style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:14px;flex-shrink:0;padding:4px;line-height:1;">&#10005;</button>' +
+      '</div>';
+    }).join('');
+  }
+  function saveReviewNotes() {
+    try { sessionStorage.setItem('pero-review-notes', JSON.stringify(reviewNotesBySection)); } catch(e) {}
+    toast('Review notes saved', 'success');
+    closeReviewNotes();
+  }
+
+  // Confirmation dialog
+  var confirmCallback = null;
+  var confirmWord = '';
+  function openConfirm(title, message, word, callback) {
+    confirmWord = word.toLowerCase();
+    confirmCallback = callback;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-word-display').textContent = '"' + word + '"';
+    document.getElementById('confirm-input').value = '';
+    var btn = document.getElementById('confirm-btn');
+    btn.disabled = true; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed';
+    document.getElementById('confirm-overlay').style.display = 'block';
+    document.getElementById('confirm-modal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('confirm-input').focus(); }, 80);
+  }
+  function closeConfirm() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-modal').style.display = 'none';
+    confirmCallback = null;
+  }
+  function checkConfirmWord() {
+    var val = document.getElementById('confirm-input').value.toLowerCase();
+    var btn = document.getElementById('confirm-btn');
+    if (val === confirmWord) {
+      btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+    } else {
+      btn.disabled = true; btn.style.opacity = '0.4'; btn.style.cursor = 'not-allowed';
+    }
+  }
+  function executeConfirm() { if (confirmCallback) { confirmCallback(); } closeConfirm(); }
+
+  // Confirm wrappers
+  function confirmToggleUser(id) {
+    var u = users.find(function(u) { return u.id === id; }); if (!u) return;
+    var word = u.isActive ? 'deactivate' : 'activate';
+    var action = u.isActive ? 'Deactivate' : 'Activate';
+    openConfirm(action + ' User', action + ' "' + u.username + '"?', word, function() { toggleUser(id); });
+  }
+  function confirmDeleteUser(id) {
+    var u = users.find(function(u) { return u.id === id; }); if (!u) return;
+    openConfirm('Delete User', 'Permanently remove "' + u.username + '" and all their permissions?', 'delete', function() { deleteUser(id); });
+  }
+  function confirmToggleArea(id) {
+    var a = areas.find(function(a) { return a.id === id; }); if (!a) return;
+    var word = a.isActive ? 'deactivate' : 'activate';
+    var action = a.isActive ? 'Deactivate' : 'Activate';
+    openConfirm(action + ' Page Group', action + ' "' + a.name + '"?', word, function() { toggleArea(id); });
+  }
+  function confirmDeleteArea(id) {
+    var a = areas.find(function(a) { return a.id === id; }); if (!a) return;
+    openConfirm('Delete Page Group', 'Permanently remove "' + a.name + '" and all its permissions?', 'delete', function() { deleteArea(id); });
+  }
+
+  // Helpers
+  function updateCounts() {
+    document.getElementById('users-count').textContent = users.length;
+    document.getElementById('pagegroups-count').textContent = areas.length;
+  }
+  function clearFields() {
+    for (var i = 0; i < arguments.length; i++) {
+      var el = document.getElementById(arguments[i]);
+      if (el) { el.value = ''; }
+    }
+  }
+
+  var toastTimer;
+  function toast(msg, type) {
+    type = type || 'success';
+    var t = document.getElementById('adm-toast');
+    t.innerHTML = (type === 'success' ? '&#9989;' : '&#10060;') + ' ' + msg;
+    t.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.className = ''; }, 2800);
+  }
+
+  // Seed data
+  users = [
+    { id: nextUserId++, username: 'admin',   email: 'admin@perofamilyfarms.com',    isActive: true,  createdAt: new Date('2026-01-10') },
+    { id: nextUserId++, username: 'jsmith',  email: 'j.smith@perofamilyfarms.com',  isActive: true,  createdAt: new Date('2026-02-01') },
+    { id: nextUserId++, username: 'mlopez',  email: 'm.lopez@perofamilyfarms.com',  isActive: true,  createdAt: new Date('2026-03-15') },
+    { id: nextUserId++, username: 'kwilson', email: 'k.wilson@perofamilyfarms.com', isActive: false, createdAt: new Date('2026-04-02') }
+  ];
+  areas = [
+    { id: nextAreaId++, name: 'Inventory',      description: 'Stock levels and warehouse data', isActive: true, sortOrder: 1, createdAt: new Date() },
+    { id: nextAreaId++, name: 'Sales',           description: 'Orders, customers, revenue',      isActive: true, sortOrder: 2, createdAt: new Date() },
+    { id: nextAreaId++, name: 'Production',      description: 'Manufacturing runs and outputs',  isActive: true, sortOrder: 3, createdAt: new Date() },
+    { id: nextAreaId++, name: 'Purchase Orders', description: 'Inbound POs from vendors',        isActive: true, sortOrder: 4, createdAt: new Date() },
+    { id: nextAreaId++, name: 'Supply & Demand', description: 'Projections and forecasting',     isActive: true, sortOrder: 5, createdAt: new Date() }
+  ];
+  access = [
+    {userId:1,areaId:1,grantedAt:new Date()},{userId:1,areaId:2,grantedAt:new Date()},
+    {userId:1,areaId:3,grantedAt:new Date()},{userId:1,areaId:4,grantedAt:new Date()},
+    {userId:1,areaId:5,grantedAt:new Date()},
+    {userId:2,areaId:1,grantedAt:new Date()},{userId:2,areaId:2,grantedAt:new Date()},
+    {userId:3,areaId:2,grantedAt:new Date()},{userId:3,areaId:5,grantedAt:new Date()}
+  ];
+  updateCounts(); renderUsersTable(); renderAreasTable();
+</script>
+</body>
+</html>

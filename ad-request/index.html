@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  AD REQUEST WORKFLOW — project.html
+  Version: 2.0  |  Last updated: 2026-05-27
+  Built for: Produce Distribution — internal promotional ad approval tool
+================================================================================
+
+  WHAT'S NEW IN v2
+  ────────────────
+  • Volume formula corrected: Normal Vol + Promo Lift = Promo Vol (calculated,
+    read-only). Promotions always result in increased unit sales. Promo Lift
+    is the incremental cases expected — Promo Vol is never manually entered.
+  • Landed Cost / case field added to every item (amber-highlighted)
+  • Live margin analysis panel per item:
+      Normal Margin/cs, Promo Margin/cs (green/red), Break-Even Landed (amber)
+  • Supply stage now shows full financial picture before approve/decline
+  • Excel export expanded to 39 columns (all margin fields included)
+  • Weekly calendar drill-down shows margin/cs per row
+  • itemPromoVol() helper ensures correct volumes across all views,
+    with backward compatibility for pre-v2 records
+
+  HANDOFF NOTES
+  ─────────────
+  This is a self-contained single-file application. No build step, no package
+  manager, no server required. Open directly in a browser or load into a
+  Cowork session.
+
+  QUICK START
+  ───────────
+  1. Open project.html in Chrome or Edge (primary tested browsers)
+  2. Demo data auto-seeds on first load (7 approved requests across 4 customers)
+  3. To clear demo data:  localStorage.clear(); location.reload();
+
+  EXTERNAL DEPENDENCIES (CDN — requires internet)
+  ────────────────────────────────────────────────
+  • Tabler Icons webfont  (cdn.jsdelivr.net)    — all icons throughout the UI
+  • SheetJS / xlsx 0.18.5 (cdnjs.cloudflare.com) — Excel export
+  • Chart.js 4.4.1        (cdnjs.cloudflare.com) — dashboard + weekly charts
+  ⚠️  Icons will not render and Excel export will fail when fully offline.
+      To work offline: download assets, update src/href to local paths.
+
+  DATA PERSISTENCE
+  ────────────────
+  All data lives in window.localStorage under these keys:
+    • adRequests   — array of finalized request objects (see data shape below)
+    • emailConfig  — department email addresses
+    • emailLog     — sent notification history
+  ⚠️  localStorage is per-browser, per-origin. ~5MB cap. No shared state.
+      Wrap all setItem calls in try/catch before production use.
+
+  ITEM DATA SHAPE (v2)
+  ────────────────────
+  Each item in request.items:
+    id, name, normalVol, promoLift, promoVol (= normalVol + promoLift),
+    landedCost, normalFOB, normalDLVD, promoFOB, promoDLVD,
+    preApproved, customerRequest
+
+  Margin formulas (computed at render time, not stored):
+    normalMargin    = normalDLVD - landedCost
+    promoMargin     = promoDLVD  - landedCost
+    breakEvenLanded = promoDLVD  - normalMargin   (= promoDLVD - (normalDLVD - landedCost))
+
+  EMAIL DELIVERY
+  ──────────────
+  ⚠️  TODO (HIGH PRIORITY): Email sending is SIMULATED.
+  The "Send all notifications" button writes to localStorage only.
+  To connect real email:
+    1. Replace sendAllEmails() body with a fetch() POST to your backend
+    2. Backend calls SendGrid, Mailgun, or SES
+    3. API keys MUST be server-side — never embedded in client JS
+
+  KNOWN ISSUES (see project-context.md §5 for full list)
+  ───────────────────────────────────────────────────────
+  1. No authentication — any user can act as any department
+  2. Product dropdown has 20 SKUs; full catalog has ~160 (see §JS-CONSTANTS)
+  3. Mobile layout breaks below ~900px (no responsive sidebar)
+  4. pendingEmails[] is in-memory; lost on refresh before sending
+  5. No date validation (stop ship ≥ start ship not enforced)
+  6. No margin gate — negative-margin items can still be submitted
+
+  CODE SECTIONS — search these markers to navigate
+  ─────────────────────────────────────────────────
+  /* §CSS-LAYOUT */   App shell, sidebar, main, nav
+  /* §CSS-FORM */     Form elements, panels, item cards
+  /* §CSS-TABLES */   Tables, metrics, charts, toast
+  /* §CSS-WEEKLY */   Weekly calendar grid styles
+  /* §JS-CONSTANTS */ PRODUCTS[], color palettes
+  /* §JS-STATE */     Global state variables
+  /* §JS-ROUTING */   Page switching, toast
+  /* §JS-FORM */      addItem(), updateItem(), updateCalcDisplay(), renderItems()
+  /* §JS-STAGES */    Stage submission + render functions
+  /* §JS-EXCEL */     buildExcelData() — 39 columns, exportAllToExcel()
+  /* §JS-EMAIL */     queueEmail(), sendAllEmails() (simulated)
+  /* §JS-DASHBOARD */ renderDashboard(), charts
+  /* §JS-LOG */       renderLog()
+  /* §JS-WEEKLY */    itemPromoVol(), renderCustomerGrid(), renderConflictGrid()
+  /* §JS-SEED */      seedDemoData() + init
+================================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ad Request Workflow</title>
+<!-- TODO: For offline use, download these and reference local paths -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* §CSS-LAYOUT — App shell, sidebar, navigation, main content area */
+/* NOTE: No responsive breakpoints yet. Sidebar breaks below ~900px viewport.
+   TODO: Add hamburger menu + collapsible sidebar for mobile. */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:rgba(255,255,255,0.90);--bg2:rgba(248,248,247,0.80);--bg3:transparent;
+  --text:#1a1a18;--text2:#6b6b67;--text3:#9b9b97;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
+  --blue:#185FA5;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+  --green:#3B6D11;--green-bg:#EAF3DE;--green-text:#27500A;
+  --red:#A32D2D;--red-bg:#FCEBEB;--red-text:#791F1F;
+  --amber:#854F0B;--amber-bg:#FAEEDA;--amber-text:#633806;
+  --r-md:8px;--r-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1e1e1c;--bg2:#2a2a27;--bg3:#323230;
+    --text:#f0efeb;--text2:#a8a8a4;--text3:#6b6b67;
+    --border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.22);
+    --blue:#378ADD;--blue-bg:#0C447C;--blue-text:#B5D4F4;
+    --green:#639922;--green-bg:#27500A;--green-text:#C0DD97;
+    --red:#E24B4A;--red-bg:#791F1F;--red-text:#F7C1C1;
+    --amber:#EF9F27;--amber-bg:#633806;--amber-text:#FAC775;
+  }
+}
+body{font-family:'Montserrat',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:url('https://www.perofamilyfarms.com/wp-content/themes/pero-family-farms/images/pero-farm-footer-bg.jpg') center top / cover no-repeat fixed;color:var(--text);font-size:14px;line-height:1.5}
+.topbar{background:rgba(29,59,105,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:0.5px solid rgba(255,255,255,0.12);padding:0 24px;display:flex;align-items:center;gap:24px;height:60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.3)}
+.topbar-logo{font-weight:800;font-size:17px;color:#fff;white-space:nowrap;letter-spacing:0.2px}
+.topbar-logo span{color:#f5c518;font-weight:400;font-size:15px}
+.topbar-right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.topbar-home{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:1px solid rgba(255,255,255,0.20);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.03em;transition:all 0.15s}
+.topbar-home:hover{color:#f5c518;border-color:rgba(245,197,24,0.50)}
+.topbar-pill{background:rgba(22,163,74,0.20);color:#4ade80;border:1px solid rgba(74,222,128,0.3);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px}
+.topbar-dot{width:6px;height:6px;background:#4ade80;border-radius:50%;animation:tbpulse 2s infinite}
+@keyframes tbpulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.app-shell{display:flex;height:calc(100vh - 60px);background:transparent}
+.sidebar{width:220px;background:rgba(29,59,105,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-right:0.5px solid rgba(255,255,255,0.12);padding:1.5rem 0;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar-logo{padding:0 1.25rem 1.5rem;font-size:15px;font-weight:500;color:#ffffff;border-bottom:0.5px solid rgba(255,255,255,0.12);margin-bottom:1rem}
+.sidebar-logo span{display:block;font-size:11px;color:rgba(255,255,255,0.50);font-weight:400;margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 1.25rem;font-size:13px;color:rgba(255,255,255,0.65);cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:background 0.1s}
+.nav-item:hover{background:rgba(255,255,255,0.07);color:#ffffff}
+.nav-item.active{background:rgba(245,197,24,0.14);color:#f5c518;font-weight:500;border-left:3px solid #f5c518}
+.nav-item i{font-size:17px;flex-shrink:0}
+.main{flex:1;padding:1.5rem;overflow-y:auto;max-width:960px;background:transparent}
+.page{display:none}.page.active{display:block}
+.page-title{font-size:20px;font-weight:500;margin-bottom:1.5rem;color:var(--text)}
+.panel{background:rgba(255,255,255,0.90);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:1.25rem;margin-bottom:1rem}
+.panel-title{font-size:14px;font-weight:500;margin-bottom:1rem;display:flex;align-items:center;gap:8px;color:var(--text)}
+.panel-title i{font-size:17px;color:var(--text3)}
+.stage-bar{display:flex;margin-bottom:1.25rem;border-radius:var(--r-lg);overflow:hidden;border:0.5px solid var(--border)}
+.stage-step{flex:1;padding:10px 6px;text-align:center;font-size:11px;font-weight:500;background:rgba(240,239,235,0.75);color:var(--text3);border-right:0.5px solid var(--border);cursor:pointer;transition:background 0.12s;line-height:1.3}
+.stage-step:last-child{border-right:none}
+.stage-step.active{background:rgba(245,197,24,0.92);color:#1d3b69}
+.stage-step.done{background:rgba(45,90,15,0.82);color:#d4edaa}
+.stage-step.declined{background:var(--red-bg);color:var(--red-text)}
+.stage-num{display:block;font-size:15px;font-weight:500;margin-bottom:1px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.field-row.triple{grid-template-columns:1fr 1fr 1fr}
+.field-row.single{grid-template-columns:1fr}
+.field-group{display:flex;flex-direction:column;gap:4px}
+label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:0.02em}
+input[type=text],input[type=date],input[type=number],input[type=email],select,textarea{width:100%;font-size:13px;background:var(--bg);color:var(--text);border:0.5px solid var(--border2);border-radius:var(--r-md);padding:7px 10px;outline:none;transition:border 0.1s}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+textarea{resize:vertical;min-height:60px}
+/* §CSS-FORM — Form elements, panels, item cards, approval cards */
+/* BROWSER NOTE: 0.5px borders render as 1px in Firefox — visually acceptable */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;font-size:13px;border-radius:var(--r-md);cursor:pointer;font-weight:500;transition:all 0.1s;border:none}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{opacity:0.9}
+.btn-ghost{background:transparent;color:var(--text2);border:0.5px solid var(--border2)}
+.btn-ghost:hover{background:var(--bg2)}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{opacity:0.9}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{opacity:0.9}
+.btn-amber{background:var(--amber);color:#fff}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem}
+.badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.badge-blue{background:var(--blue-bg);color:var(--blue-text)}
+.badge-green{background:var(--green-bg);color:var(--green-text)}
+.badge-red{background:var(--red-bg);color:var(--red-text)}
+.badge-amber{background:var(--amber-bg);color:var(--amber-text)}
+.badge-gray{background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)}
+.item-card{background:rgba(240,239,235,0.75);border-radius:var(--r-md);padding:1rem;margin-bottom:10px;border:0.5px solid var(--border)}
+.add-item-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--blue);background:none;border:0.5px dashed var(--blue);border-radius:var(--r-md);padding:8px 14px;cursor:pointer;width:100%;justify-content:center;margin-bottom:10px}
+.add-item-btn:hover{background:var(--blue-bg)}
+.approval-card{border-radius:var(--r-md);padding:1rem;margin-bottom:8px;border:0.5px solid var(--border)}
+.approval-card.approved{background:var(--green-bg);border-color:var(--green)}
+.approval-card.declined{background:var(--red-bg);border-color:var(--red)}
+.radio-row{display:flex;gap:16px;align-items:center;margin-top:6px}
+.radio-row label{font-size:13px;color:var(--text);display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400;letter-spacing:0}
+.divider{border:none;border-top:0.5px solid var(--border);margin:1rem 0}
+.summary-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border)}
+.summary-row:last-child{border-bottom:none}
+.summary-label{color:var(--text2)}
+.summary-val{color:var(--text);font-weight:500}
+.calc-note{background:var(--bg2);border-radius:var(--r-md);padding:7px 10px;font-size:11px;color:var(--text2);margin-top:6px}
+.calc-note span{color:var(--text);font-weight:500}
+.info-note{font-size:12px;color:var(--text2);background:var(--bg2);border-left:3px solid var(--blue);padding:8px 12px;border-radius:0 var(--r-md) var(--r-md) 0;margin-bottom:12px}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem}
+.metric-card{background:var(--bg2);border-radius:var(--r-md);padding:1rem}
+.metric-label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:0.03em;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:500;color:var(--text)}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
+/* §CSS-TABLES — Tables, metric cards, charts, toast */
+/* PERF NOTE: chart-wrap heights are fixed px — adjust if chart data grows */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;border-bottom:0.5px solid var(--border2);font-size:11px;font-weight:500;color:var(--text2);letter-spacing:0.03em}
+td{padding:8px 10px;border-bottom:0.5px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.chart-wrap{position:relative;width:100%;height:260px}
+.chart-wrap-tall{position:relative;width:100%;height:300px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#EAF3DE;padding:10px 18px;border-radius:var(--r-md);font-size:13px;font-weight:500;z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.25s;pointer-events:none;max-width:320px}
+.toast.show{opacity:1;transform:translateY(0)}
+.email-preview{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r-md);padding:1rem;font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.7;max-height:200px;overflow-y:auto}
+.email-preview strong{color:var(--text)}
+.dept-tabs{display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap}
+.dept-tab{padding:6px 12px;font-size:12px;font-weight:500;border-radius:var(--r-md);cursor:pointer;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);transition:all 0.1s}
+.dept-tab.active{background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue)}
+.final-panel{text-align:center;padding:2rem 1rem}
+.final-icon{font-size:44px;margin-bottom:12px}
+.remove-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px}
+.remove-btn:hover{color:var(--red)}
+.legend-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;font-size:12px;color:var(--text2)}
+.legend-swatch{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px}
+/* §CSS-WEEKLY — Weekly ad calendar grid, cells, conflict highlights */
+/* BROWSER NOTE: position:sticky on td.row-header may not work in older Safari.
+   Test with Safari 16 if sticky row headers are critical. */
+.wk-grid{border-collapse:collapse;min-width:100%;font-size:12px}
+.wk-grid th{padding:8px 10px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border2);border-right:0.5px solid var(--border);white-space:nowrap;background:var(--bg2);min-width:90px}
+.wk-grid th.row-header{text-align:left;min-width:160px;position:sticky;left:0;background:var(--bg2);z-index:2}
+.wk-grid td{padding:4px 6px;border-bottom:0.5px solid var(--border);border-right:0.5px solid var(--border);vertical-align:middle;min-width:90px}
+.wk-grid td.row-header{padding:7px 10px;font-size:12px;font-weight:500;color:var(--text);position:sticky;left:0;background:var(--bg);z-index:1;border-right:0.5px solid var(--border2)}
+.wk-grid tr:last-child td{border-bottom:none}
+.wk-cell{border-radius:4px;padding:4px 7px;font-size:11px;font-weight:500;cursor:pointer;transition:opacity 0.1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+.wk-cell:hover{opacity:0.8}
+.wk-empty{color:var(--text3);text-align:center;font-size:11px}
+.wk-conflict{background:#FCEBEB;border:1px solid #F09595;border-radius:4px;padding:4px 7px;font-size:11px;font-weight:500;color:#791F1F;cursor:pointer}
+.wk-conflict:hover{opacity:0.8}
+.wk-total-row td{background:var(--bg2);font-weight:500;font-size:12px}
+.wk-today{background:var(--blue-bg) !important}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-logo">PERO <span>/ Ad Request</span></div>
+  <div class="topbar-right">
+    <a class="topbar-home" href="../index.html">&#8592; Pero Central</a>
+    <div class="topbar-pill"><span class="topbar-dot"></span>Live</div>
+  </div>
+</div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">Ad Request Workflow<span>Produce Distribution</span></div>
+    <button class="nav-item active" id="nav-form" onclick="showPage('form')"><i class="ti ti-clipboard-text"></i> New request</button>
+    <button class="nav-item" id="nav-dashboard" onclick="showPage('dashboard')"><i class="ti ti-chart-bar"></i> Dashboard</button>
+    <button class="nav-item" id="nav-log" onclick="showPage('log')"><i class="ti ti-list"></i> Request log</button>
+    <button class="nav-item" id="nav-weekly" onclick="showPage('weekly')"><i class="ti ti-calendar-week"></i> Weekly calendar</button>
+    <button class="nav-item" id="nav-email" onclick="showPage('email')"><i class="ti ti-mail"></i> Email center</button>
+    <div style="margin-top:auto">
+      <div style="padding:1rem 1.25rem;border-top:0.5px solid var(--border)">
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="exportAllToExcel()"><i class="ti ti-table-export"></i> Export all to Excel</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ===== FORM PAGE ===== -->
+    <div class="page active" id="page-form">
+      <div class="stage-bar" id="stage-bar">
+        <div class="stage-step active" id="tab-0" onclick="goTab(0)"><span class="stage-num">1</span>Sales</div>
+        <div class="stage-step" id="tab-1"><span class="stage-num">2</span>Supply</div>
+        <div class="stage-step" id="tab-2"><span class="stage-num">3</span>Freight</div>
+        <div class="stage-step" id="tab-3"><span class="stage-num">4</span>Performance</div>
+      </div>
+
+      <!-- Stage 0: Sales -->
+      <div id="stage-0">
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-clipboard-text"></i> Request details</div>
+          <div class="field-row">
+            <div class="field-group"><label>Submitted by</label><input type="text" id="submittedBy" value="Dalton Cooper"></div>
+            <div class="field-group"><label>Email</label><input type="email" id="submitterEmail" placeholder="dalton@company.com"></div>
+          </div>
+          <div class="field-row">
+            <div class="field-group"><label>Retailer / customer name</label><input type="text" id="retailer" value="Dierbergs Market"></div>
+            <div class="field-group"><label>Distributor name</label><input type="text" id="distributor"></div>
+          </div>
+          <div class="field-row triple">
+            <div class="field-group"><label>Ad break date</label><input type="date" id="adBreak"></div>
+            <div class="field-group"><label>Ad start ship</label><input type="date" id="adStart"></div>
+            <div class="field-group"><label>Ad stop ship</label><input type="date" id="adStop"></div>
+          </div>
+          <div class="field-row">
+            <div class="field-group"><label>Feedback needed by</label><input type="date" id="feedbackBy"></div>
+            <div class="field-group"><label>Customer must receive by</label><input type="date" id="customerBy"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-packages"></i> Promotional items</div>
+          <div id="items-container"></div>
+          <button class="add-item-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add promotional item</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-notes"></i> Sales notes</div>
+          <textarea id="salesNotes" placeholder="Any insight or special information about this promotion…"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="submitToSupply()"><i class="ti ti-send"></i> Submit to Supply dept.</button>
+        </div>
+      </div>
+
+      <!-- Stage 1: Supply -->
+      <div id="stage-1" style="display:none">
+        <div class="info-note">Review each item and approve or decline. Add supplier details before forwarding to Freight.</div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-building-warehouse"></i> Supply department review</div>
+          <div id="supply-items"></div>
+          <hr class="divider">
+          <div class="field-row">
+            <div class="field-group"><label>Reviewed by</label><input type="text" id="supplyReviewer" placeholder="Name"></div>
+            <div class="field-group"><label>Reviewer email</label><input type="email" id="supplyEmail" placeholder="supply@company.com"></div>
+          </div>
+          <div class="field-row triple">
+            <div class="field-group"><label>Supplier name</label><input type="text" id="supplierName"></div>
+            <div class="field-group"><label>Variety / style</label><input type="text" id="varietyStyle"></div>
+            <div class="field-group"><label>In-racks cost ($)</label><input type="number" id="inRacksCost" step="0.01"></div>
+          </div>
+          <div class="field-row single"><div class="field-group"><label>Supply notes</label><textarea id="supplyNotes" placeholder="Supply team comments…"></textarea></div></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTab(0)"><i class="ti ti-arrow-left"></i> Back</button>
+          <button class="btn btn-primary" onclick="submitToFreight()">Forward to Freight <i class="ti ti-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Stage 2: Freight -->
+      <div id="stage-2" style="display:none">
+        <div class="info-note">Confirm freight scheduling and costs before forwarding to Performance for final approval.</div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-truck-delivery"></i> Freight department review</div>
+          <div id="freight-summary"></div>
+          <hr class="divider">
+          <div class="field-row">
+            <div class="field-group"><label>Freight reviewer</label><input type="text" id="freightReviewer" placeholder="Name"></div>
+            <div class="field-group"><label>Reviewer email</label><input type="email" id="freightEmail" placeholder="freight@company.com"></div>
+          </div>
+          <div class="field-row triple">
+            <div class="field-group"><label>Delivery window</label><input type="text" id="deliveryWindow" placeholder="e.g. 6/29 – 7/2"></div>
+            <div class="field-group"><label>Carrier / route</label><input type="text" id="carrier"></div>
+            <div class="field-group"><label>Freight cost est. ($)</label><input type="number" id="freightCost" step="0.01"></div>
+          </div>
+          <div class="field-row single"><div class="field-group"><label>Freight notes</label><textarea id="freightNotes" placeholder="Scheduling or logistical notes…"></textarea></div></div>
+          <div class="field-row single"><div class="field-group"><label>Freight sign-off</label>
+            <div class="radio-row">
+              <label><input type="radio" name="freightDecision" value="cleared"> Cleared for delivery</label>
+              <label><input type="radio" name="freightDecision" value="flagged"> Flag for review</label>
+            </div>
+          </div></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTab(1)"><i class="ti ti-arrow-left"></i> Back</button>
+          <button class="btn btn-primary" onclick="submitToPerformance()">Forward to Performance <i class="ti ti-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Stage 3: Performance -->
+      <div id="stage-3" style="display:none">
+        <div class="info-note">Final approval stage. Review the complete request and issue the final decision.</div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-chart-bar"></i> Full request summary</div>
+          <div id="perf-summary"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><i class="ti ti-gavel"></i> Performance — final decision</div>
+          <div class="field-row">
+            <div class="field-group"><label>Reviewed by</label><input type="text" id="perfReviewer" placeholder="Peter Pero V"></div>
+            <div class="field-group"><label>Reviewer email</label><input type="email" id="perfEmail" placeholder="performance@company.com"></div>
+          </div>
+          <div class="field-row">
+            <div class="field-group"><label>Product ID</label><input type="text" id="productId"></div>
+            <div class="field-group"><label>Final decision</label>
+              <div class="radio-row">
+                <label><input type="radio" name="finalDecision" value="approved"> <span style="color:var(--green);font-weight:500">Approved</span></label>
+                <label><input type="radio" name="finalDecision" value="declined"> <span style="color:var(--red);font-weight:500">Declined</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="field-row single"><div class="field-group"><label>Performance notes</label><textarea id="perfNotes"></textarea></div></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTab(2)"><i class="ti ti-arrow-left"></i> Back</button>
+          <button class="btn btn-primary" onclick="finalizeRequest()"><i class="ti ti-check"></i> Finalize request</button>
+        </div>
+      </div>
+
+      <!-- Stage Complete -->
+      <div id="stage-complete" style="display:none">
+        <div class="panel final-panel">
+          <div class="final-icon" id="final-icon">✅</div>
+          <div style="font-size:20px;font-weight:500;margin-bottom:6px" id="final-title">Ad request approved</div>
+          <div style="color:var(--text2);font-size:13px;margin-bottom:1.5rem" id="final-sub">All four departments signed off.</div>
+          <div id="final-detail" style="text-align:left;margin-bottom:1.5rem"></div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="resetForm()"><i class="ti ti-plus"></i> New request</button>
+            <button class="btn btn-primary" onclick="exportSingleExcel()"><i class="ti ti-table-export"></i> Export this request</button>
+            <button class="btn btn-amber" onclick="previewEmailDraft()"><i class="ti ti-mail"></i> Send notification emails</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DASHBOARD PAGE ===== -->
+    <div class="page" id="page-dashboard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+        <div class="page-title" style="margin-bottom:0">Dashboard</div>
+        <button class="btn btn-ghost" onclick="renderDashboard()"><i class="ti ti-refresh"></i> Refresh</button>
+      </div>
+      <div class="metric-grid" id="dash-metrics"></div>
+      <div class="dept-tabs" id="dash-tabs">
+        <button class="dept-tab active" onclick="switchDashTab('customer',this)">By customer</button>
+        <button class="dept-tab" onclick="switchDashTab('product',this)">By product</button>
+        <button class="dept-tab" onclick="switchDashTab('supply',this)">By supply status</button>
+      </div>
+      <div class="panel" id="dash-chart-panel">
+        <div class="legend-row" id="dash-legend"></div>
+        <div class="chart-wrap-tall"><canvas id="dashChart" role="img" aria-label="Ad request distribution chart">Ad request data chart</canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><i class="ti ti-list"></i> Recent requests</div>
+        <div class="table-wrap" id="dash-table"></div>
+      </div>
+    </div>
+
+    <!-- ===== LOG PAGE ===== -->
+    <div class="page" id="page-log">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+        <div class="page-title" style="margin-bottom:0">Request log</div>
+        <button class="btn btn-primary" onclick="exportAllToExcel()"><i class="ti ti-table-export"></i> Export all to Excel</button>
+      </div>
+      <div class="panel">
+        <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+          <input type="text" id="logSearch" placeholder="Search by retailer or product…" style="flex:1;min-width:160px" oninput="renderLog()">
+          <select id="logFilter" onchange="renderLog()">
+            <option value="">All statuses</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+        <div class="table-wrap" id="log-table"></div>
+      </div>
+    </div>
+
+    <!-- ===== EMAIL CENTER ===== -->
+    <div class="page" id="page-email">
+      <div class="page-title">Email center</div>
+      <div class="panel">
+        <div class="panel-title"><i class="ti ti-mail"></i> Notification settings</div>
+        <div class="field-row">
+          <div class="field-group"><label>Supply dept. email</label><input type="email" id="cfg-supplyEmail" placeholder="supply-team@company.com"></div>
+          <div class="field-group"><label>Freight dept. email</label><input type="email" id="cfg-freightEmail" placeholder="freight-team@company.com"></div>
+        </div>
+        <div class="field-row">
+          <div class="field-group"><label>Performance dept. email</label><input type="email" id="cfg-perfEmail" placeholder="performance@company.com"></div>
+          <div class="field-group"><label>CC (optional)</label><input type="email" id="cfg-ccEmail" placeholder="manager@company.com"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="saveEmailConfig()"><i class="ti ti-device-floppy"></i> Save settings</button></div>
+      </div>
+      <div class="panel" id="email-log-panel">
+        <div class="panel-title"><i class="ti ti-clock"></i> Sent notifications</div>
+        <div id="email-log-content" style="font-size:13px;color:var(--text2)">No notifications sent yet.</div>
+      </div>
+      <div class="panel" id="email-draft-panel" style="display:none">
+        <div class="panel-title"><i class="ti ti-send"></i> Draft notifications</div>
+        <div id="email-drafts"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="document.getElementById('email-draft-panel').style.display='none'">Cancel</button>
+          <button class="btn btn-primary" onclick="sendAllEmails()"><i class="ti ti-send"></i> Send all notifications</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WEEKLY CALENDAR PAGE ===== -->
+    <div class="page" id="page-weekly">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">
+        <div class="page-title" style="margin-bottom:0">Weekly ad calendar</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="wk-prev" onclick="shiftWeeks(-4)"><i class="ti ti-chevron-left"></i></button>
+          <span id="wk-range-label" style="font-size:13px;color:var(--text2);min-width:200px;text-align:center"></span>
+          <button class="btn btn-ghost" id="wk-next" onclick="shiftWeeks(4)"><i class="ti ti-chevron-right"></i></button>
+          <button class="btn btn-ghost" onclick="resetWeekView()"><i class="ti ti-home"></i></button>
+        </div>
+      </div>
+
+      <div class="dept-tabs" id="wk-view-tabs">
+        <button class="dept-tab active" onclick="switchWeekView('customer',this)"><i class="ti ti-building-store" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>By customer</button>
+        <button class="dept-tab" onclick="switchWeekView('product',this)"><i class="ti ti-packages" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>By product</button>
+        <button class="dept-tab" onclick="switchWeekView('conflict',this)"><i class="ti ti-alert-triangle" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Conflict view</button>
+      </div>
+
+      <div class="panel" id="wk-legend-panel">
+        <div id="wk-legend" style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text2)"></div>
+      </div>
+
+      <div class="panel" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <div id="wk-calendar-grid"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="wk-detail-panel" style="display:none">
+        <div class="panel-title"><i class="ti ti-info-circle"></i> <span id="wk-detail-title">Week detail</span></div>
+        <div id="wk-detail-body"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><i class="ti ti-chart-bar"></i> Weekly volume summary</div>
+        <div id="wk-vol-legend" class="legend-row" style="margin-bottom:8px"></div>
+        <div style="position:relative;width:100%;height:240px">
+          <canvas id="wkVolChart" role="img" aria-label="Weekly promotional volume by week">Weekly volume chart</canvas>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* §JS-CONSTANTS — Static data: product catalog, color palettes */
+
+/* TODO (MEDIUM): Replace this 20-item list with the full ~160-SKU product
+   catalog from Sheet1 of the source Excel file. Consider adding a typeahead
+   input (e.g. using a datalist element) since a flat 160-item select is
+   unwieldy. The full list was extracted during initial build and is available
+   in the original project conversation. */
+const PRODUCTS = ['FW CV Okra 12/12oz Tray','FW CV Okra 6/12oz Tray','FC CV Green Beans Snipped 6/12oz Bag','FC CV Broccoli Florets 6/12oz Bag','FC CV French Beans Trimmed 6/12oz Bag','FW CV Mini Sweet Pep 12/8oz Bag','FW CV Mini Sweet Pep 12/1Lb Bag','FW CV Mini Cukes 8/16oz Bag','FW CV Zucchini 12/1ct Indi Wrapped','EZVEG CV Pepper & Onions 4/10oz Tray','FC CV Vegetable Medley 6/12oz Bag','FC CV Snap Peas Trimmed 6/8oz Bag','COMM CV Green Beans US 1 1/2 Bushel','COMM CV Broccoli Crown Approx18lb','FC CV Cauliflower Florets 6/10oz Bag','FC CV Cauliflower Riced 6/12oz Bag','FW CV Green Pepper 8/6ct Bag','FW CV Mini Sweet Pep 6/24oz Bag','FC CV Fajita Mix Sliced 6/12oz Bag','FC CV Broccoli Slaw 6/12oz Bag'];
+
+/* §JS-STATE — Global state variables
+   state         : current in-progress form (reset on new request)
+   allRequests   : all saved requests from localStorage
+   currentRequest: last finalized request (used for single export)
+   dashChart     : Chart.js instance — always destroy() before recreating
+   wkVolChart    : Weekly volume Chart.js instance — same destroy pattern
+   wkOffset      : week navigation offset (0 = current week)
+   wkView        : active weekly calendar tab ('customer'|'product'|'conflict')
+
+   REFACTOR NOTE: allRequests is reloaded from localStorage in many render
+   functions rather than using this variable. Normalize to read once on load
+   and keep in sync on every write. */
+let state = { items:[], supplyDecisions:{}, nextId:1 };
+let allRequests = JSON.parse(localStorage.getItem('adRequests')||'[]');
+let emailConfig = JSON.parse(localStorage.getItem('emailConfig')||'{}');
+let emailLog = JSON.parse(localStorage.getItem('emailLog')||'[]');
+let currentRequest = null;
+let dashChart = null;
+let currentDashTab = 'customer';
+
+/* §JS-ROUTING — Page switching and global UI utilities */
+function showPage(p){
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('nav-'+p).classList.add('active');
+  if(p==='dashboard') renderDashboard();
+  if(p==='log') renderLog();
+  if(p==='email') renderEmailConfig();
+  if(p==='weekly') renderWeeklyCalendar();
+}
+
+function showToast(msg, color){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=color||'var(--green)';
+  t.style.color=color?'#fff':'#EAF3DE';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+/* §JS-FORM — Form rendering, live volume + margin calculations, item management
+   ─────────────────────────────────────────────────────────────────────────────
+   v2 FORMULA: Promo Vol = Normal Vol + Promo Lift  (enforced here, never user-entered)
+
+   updateItem()        — updates any field; always recalcs promoVol after
+   updateCalcDisplay() — renders the live calc panel (vol tiles + revenue + margin)
+   renderItems()       — rebuilds full item card list; recalcs promoVol on every render
+
+   MARGIN MATH (all in updateCalcDisplay):
+     normalMargin     = normalDLVD − landedCost
+     promoMargin      = promoDLVD  − landedCost
+     breakEvenLanded  = promoDLVD  − normalMargin  (= promoDLVD − (normalDLVD − landedCost))
+     Panel is green when promoMargin ≥ 0, red when promoMargin < 0
+
+   TODO: Add min="0" enforcement — currently accepts negative input values
+   TODO: Add margin gate: warn/block when promoMargin < 0 before submitToSupply()
+   PERF NOTE: renderItems() rebuilds entire list on every keystroke.
+   Acceptable for ≤10 items. Switch to targeted updates for 20+ items. */
+function setDateDefaults(){
+  const d=new Date(),fmt=d=>d.toISOString().split('T')[0];
+  const add=(n)=>{const x=new Date();x.setDate(x.getDate()+n);return fmt(x)};
+  const setIfEmpty=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value)el.value=v};
+  setIfEmpty('feedbackBy',add(7));setIfEmpty('customerBy',add(7));
+  setIfEmpty('adBreak',add(35));setIfEmpty('adStart',add(30));setIfEmpty('adStop',add(36));
+}
+
+function addItem(prefill){
+  const id=state.nextId++;
+  // v2 DATA SHAPE:
+  //   normalVol   = baseline weekly cases (entered by Sales)
+  //   promoLift   = incremental cases expected from promotion (entered by Sales)
+  //   promoVol    = normalVol + promoLift  (CALCULATED — never user-entered)
+  //   landedCost  = raw product cost/case for the ad period (drives margin analysis)
+  // TODO: add 'marginNotes' field for Sales to explain negative-margin items
+  state.items.push({
+    id,
+    name:        prefill?'FW CV Okra 12/12oz Tray':'',
+    normalVol:   prefill?20:'',      // baseline cases/week
+    promoLift:   prefill?10:'',      // incremental lift cases (NOT total)
+    // promoVol = normalVol + promoLift  (auto-calc, stored for export)
+    normalFOB:   prefill?23.54:'',
+    normalDLVD:  prefill?27.33:'',
+    promoFOB:    prefill?22.54:'',
+    promoDLVD:   prefill?26.33:'',
+    landedCost:  prefill?18.50:'',   // § NEW: cost/case raw product for period
+    preApproved: prefill?'Yes':'',
+    customerRequest: prefill?'Yes':''
+  });
+  renderItems();
+}
+
+function removeItem(id){state.items=state.items.filter(i=>i.id!==id);renderItems();}
+
+function updateItem(id,field,val){
+  const item=state.items.find(i=>i.id===id);
+  if(!item)return;
+  const strFields=['name','preApproved','customerRequest'];
+  item[field]=strFields.includes(field)?val:(val===''?'':parseFloat(val)||0);
+  // Always recalculate promoVol = normalVol + promoLift
+  item.promoVol = (+item.normalVol||0) + (+item.promoLift||0);
+  updateCalcDisplay(id);
+}
+
+function updateCalcDisplay(id){
+  const item=state.items.find(i=>i.id===id);
+  const el=document.getElementById('calc-'+id);
+  if(!item||!el)return;
+
+  const normalVol  = +item.normalVol  || 0;
+  const promoLift  = +item.promoLift  || 0;
+  const promoVol   = normalVol + promoLift;           // § FORMULA: always > normalVol
+  const normalDLVD = +item.normalDLVD || 0;
+  const promoDLVD  = +item.promoDLVD  || 0;
+  const landedCost = +item.landedCost || 0;
+
+  const normalRevenue = normalVol * normalDLVD;
+  const promoRevenue  = promoVol  * promoDLVD;
+  const revenueChange = promoRevenue - normalRevenue;
+
+  // Margin calculations (only meaningful when landedCost is entered)
+  const normalMargin     = landedCost > 0 ? normalDLVD - landedCost : null;
+  const promoMargin      = landedCost > 0 ? promoDLVD  - landedCost : null;
+  const normalMarginPct  = (normalMargin !== null && normalDLVD > 0) ? (normalMargin/normalDLVD*100) : null;
+  const promoMarginPct   = (promoMargin  !== null && promoDLVD  > 0) ? (promoMargin /promoDLVD *100) : null;
+  const marginOk         = promoMarginPct !== null && promoMarginPct >= 0;
+
+  // Break-Even Landed = the max landed cost that maintains the same $/cs margin as normal
+  // Derivation: normalMargin = normalDLVD − landedCost
+  //             To keep same $ margin at promo price: promoDLVD − newLandedCost ≥ normalMargin
+  //             Therefore: newLandedCost ≤ promoDLVD − normalMargin
+  const breakEvenLanded  = (normalMargin !== null && promoDLVD > 0)
+    ? promoDLVD - normalMargin
+    : null;
+
+  const liftPct = normalVol > 0 ? ((promoLift/normalVol)*100).toFixed(0) : '—';
+
+  // Volume row — always shown
+  let html = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">NORMAL VOL</div>
+      <div style="font-size:13px;font-weight:500">${normalVol} cs/wk</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">PROMO LIFT</div>
+      <div style="font-size:13px;font-weight:500;color:var(--blue)">+ ${promoLift} cs</div>
+    </div>
+    <div style="background:var(--blue-bg);border-radius:var(--r-md);padding:7px 10px;border:0.5px solid var(--blue)">
+      <div style="font-size:10px;color:var(--blue-text);margin-bottom:2px">PROMO VOL (TOTAL)</div>
+      <div style="font-size:13px;font-weight:500;color:var(--blue-text)">${promoVol} cs/wk</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">LIFT %</div>
+      <div style="font-size:13px;font-weight:500;color:${promoLift>0?'var(--green)':'var(--text3)'}">${liftPct !== '—' ? '+'+liftPct+'%' : '—'}</div>
+    </div>
+  </div>`;
+
+  // Revenue row
+  const revColor = revenueChange >= 0 ? 'var(--green)' : 'var(--red)';
+  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">NORMAL REVENUE</div>
+      <div style="font-size:13px;font-weight:500">$${normalRevenue.toFixed(2)}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">PROMO REVENUE</div>
+      <div style="font-size:13px;font-weight:500">$${promoRevenue.toFixed(2)}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:2px">REVENUE CHANGE</div>
+      <div style="font-size:13px;font-weight:500;color:${revColor}">${revenueChange>=0?'+':''}$${revenueChange.toFixed(2)}</div>
+    </div>
+  </div>`;
+
+  // Margin analysis row — only when landed cost is entered
+  if(landedCost > 0){
+    const marginBg  = marginOk ? 'var(--green-bg)' : 'var(--red-bg)';
+    const marginTxt = marginOk ? 'var(--green-text)' : 'var(--red-text)';
+    const marginBdr = marginOk ? 'var(--green)' : 'var(--red)';
+    html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">LANDED COST/CS</div>
+        <div style="font-size:13px;font-weight:500">$${landedCost.toFixed(2)}</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:7px 10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">NORMAL MARGIN/CS</div>
+        <div style="font-size:13px;font-weight:500">$${normalMargin.toFixed(2)} <span style="font-size:10px;color:var(--text3)">(${normalMarginPct.toFixed(1)}%)</span></div>
+      </div>
+      <div style="background:${marginBg};border-radius:var(--r-md);padding:7px 10px;border:0.5px solid ${marginBdr}">
+        <div style="font-size:10px;color:${marginTxt};margin-bottom:2px">PROMO MARGIN/CS</div>
+        <div style="font-size:13px;font-weight:500;color:${marginTxt}">$${promoMargin.toFixed(2)} <span style="font-size:10px">(${promoMarginPct.toFixed(1)}%)</span></div>
+      </div>
+      <div style="background:var(--amber-bg);border-radius:var(--r-md);padding:7px 10px;border:0.5px solid var(--amber)">
+        <div style="font-size:10px;color:var(--amber-text);margin-bottom:2px">BREAK-EVEN LANDED</div>
+        <div style="font-size:13px;font-weight:500;color:var(--amber-text)">≤ $${breakEvenLanded.toFixed(2)}/cs</div>
+      </div>
+    </div>
+    <div style="font-size:11px;padding:5px 8px;border-radius:var(--r-md);background:${marginBg};color:${marginTxt};border-left:3px solid ${marginBdr}">
+      ${marginOk
+        ? `✓ Promo margin intact at ${promoMarginPct.toFixed(1)}%. Supply needs landed cost ≤ $${breakEvenLanded.toFixed(2)}/cs to maintain $${normalMargin.toFixed(2)}/cs margin.`
+        : `⚠ Promo DLVD ($${promoDLVD.toFixed(2)}) is below landed cost ($${landedCost.toFixed(2)}). This promotion loses $${Math.abs(promoMargin).toFixed(2)}/cs. Renegotiate pricing or landed cost.`
+      }
+    </div>`;
+  } else {
+    html += `<div style="font-size:11px;color:var(--text3);padding:4px 8px">Enter landed cost/case above to see margin analysis.</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function renderItems(){
+  const c=document.getElementById('items-container');c.innerHTML='';
+  state.items.forEach((item,idx)=>{
+    // Always keep promoVol in sync on render
+    item.promoVol = (+item.normalVol||0) + (+item.promoLift||0);
+    const d=document.createElement('div');d.className='item-card';
+    d.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-weight:500;font-size:13px">Item ${idx+1}</span>
+      <button class="remove-btn" onclick="removeItem(${item.id})" aria-label="Remove item"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div class="field-row single" style="margin-bottom:8px"><div class="field-group"><label>Product</label>
+      <select onchange="updateItem(${item.id},'name',this.value)"><option value="">— Select product —</option>
+        ${PRODUCTS.map(p=>`<option value="${p}" ${item.name===p?'selected':''}>${p}</option>`).join('')}
+      </select></div></div>
+
+    <div style="font-size:10px;font-weight:500;color:var(--text3);letter-spacing:0.06em;margin:10px 0 6px">VOLUME — Normal Vol + Promo Lift = Promotional Volume</div>
+    <div class="field-row triple" style="margin-bottom:4px">
+      <div class="field-group">
+        <label>Normal vol (cases/wk)</label>
+        <input type="number" min="0" value="${item.normalVol}" oninput="updateItem(${item.id},'normalVol',this.value)" placeholder="0">
+        <span style="font-size:10px;color:var(--text3)">Baseline weekly cases</span>
+      </div>
+      <div class="field-group">
+        <label>Promo lift (cases)</label>
+        <input type="number" min="0" value="${item.promoLift}" oninput="updateItem(${item.id},'promoLift',this.value)" placeholder="0">
+        <span style="font-size:10px;color:var(--text3)">Incremental lift expected</span>
+      </div>
+      <div class="field-group">
+        <label>Promo vol — total cases</label>
+        <div style="background:var(--blue-bg);border:0.5px solid var(--blue);border-radius:var(--r-md);padding:7px 10px;font-size:13px;font-weight:500;color:var(--blue-text)" id="promoVol-display-${item.id}">
+          ${item.promoVol} cs/wk
+        </div>
+        <span style="font-size:10px;color:var(--blue-text);font-weight:500">= Normal + Lift (calculated)</span>
+      </div>
+    </div>
+
+    <div style="font-size:10px;font-weight:500;color:var(--text3);letter-spacing:0.06em;margin:10px 0 6px">PRICING</div>
+    <div class="field-row triple">
+      <div class="field-group">
+        <label>Landed cost / case ($)</label>
+        <input type="number" step="0.01" min="0" value="${item.landedCost}" oninput="updateItem(${item.id},'landedCost',this.value)" placeholder="0.00" style="border-color:var(--amber)">
+        <span style="font-size:10px;color:var(--amber-text);font-weight:500">Raw product cost for period</span>
+      </div>
+      <div class="field-group">
+        <label>Normal DLVD / case ($)</label>
+        <input type="number" step="0.01" min="0" value="${item.normalDLVD}" oninput="updateItem(${item.id},'normalDLVD',this.value)" placeholder="0.00">
+      </div>
+      <div class="field-group">
+        <label>Promo DLVD / case ($)</label>
+        <input type="number" step="0.01" min="0" value="${item.promoDLVD}" oninput="updateItem(${item.id},'promoDLVD',this.value)" placeholder="0.00">
+      </div>
+    </div>
+    <div class="field-row triple">
+      <div class="field-group">
+        <label>Normal FOB ($)</label>
+        <input type="number" step="0.01" min="0" value="${item.normalFOB}" oninput="updateItem(${item.id},'normalFOB',this.value)" placeholder="0.00">
+      </div>
+      <div class="field-group">
+        <label>Promo FOB ($)</label>
+        <input type="number" step="0.01" min="0" value="${item.promoFOB}" oninput="updateItem(${item.id},'promoFOB',this.value)" placeholder="0.00">
+      </div>
+      <div class="field-group"></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field-group"><label>Pre-approved in planner?</label><select onchange="updateItem(${item.id},'preApproved',this.value)"><option value="">—</option><option ${item.preApproved==='Yes'?'selected':''}>Yes</option><option ${item.preApproved==='No'?'selected':''}>No</option></select></div>
+      <div class="field-group"><label>Customer requested?</label><select onchange="updateItem(${item.id},'customerRequest',this.value)"><option value="">—</option><option ${item.customerRequest==='Yes'?'selected':''}>Yes</option><option ${item.customerRequest==='No'?'selected':''}>No</option></select></div>
+    </div>
+
+    <div style="margin-top:10px" id="calc-${item.id}"></div>`;
+    c.appendChild(d);
+    updateCalcDisplay(item.id);
+  });
+}
+
+function goTab(n){
+  for(let i=0;i<4;i++){
+    document.getElementById('stage-'+i).style.display=i===n?'block':'none';
+    const t=document.getElementById('tab-'+i);
+    t.className='stage-step'+(i<n?' done':i===n?' active':'');
+  }
+  document.getElementById('stage-complete').style.display='none';
+}
+
+function v(id){return document.getElementById(id)?.value||''}
+
+/* §JS-STAGES — Stage submission logic and stage-specific render functions
+   ─────────────────────────────────────────────────────────────────────
+   submitToSupply()       — validates Sales fields; transitions to stage 1; queues email
+   renderSupplyItems()    — v2: shows full margin analysis per item for Supply reviewers
+                            (normalVol+lift=promoVol, landedCost, promoMargin, breakEven)
+   submitToFreight()      — validates supplyReviewer; transitions to stage 2; queues email
+   submitToPerformance()  — validates freightReviewer; transitions to stage 3; queues email
+   finalizeRequest()      — saves request to localStorage; transitions to complete screen
+                            Note: promoVol is baked in as normalVol+promoLift on save
+
+   TODO: Add date validation in submitToSupply() (adStart ≤ adStop ≤ adBreak)
+   TODO: Add margin gate in submitToSupply() — warn if any item has promoMargin < 0 */
+function submitToSupply(){
+  if(!v('submittedBy')||!v('retailer')){showToast('Fill in submitter and retailer name.','var(--amber)');return}
+  if(state.items.length===0){showToast('Add at least one promotional item.','var(--amber)');return}
+  renderSupplyItems();
+  goTab(1);
+  queueEmail('supply',{stage:'supply',retailer:v('retailer'),submitter:v('submittedBy'),items:state.items,adBreak:v('adBreak')});
+  showToast('Submitted to Supply department');
+}
+
+function renderSupplyItems(){
+  const c=document.getElementById('supply-items');c.innerHTML='';
+  state.items.forEach((item,idx)=>{
+    const normalVol  = +item.normalVol  || 0;
+    const promoLift  = +item.promoLift  || 0;
+    const promoVol   = normalVol + promoLift;
+    const landedCost = +item.landedCost || 0;
+    const normalDLVD = +item.normalDLVD || 0;
+    const promoDLVD  = +item.promoDLVD  || 0;
+    const promoMargin      = landedCost > 0 ? promoDLVD - landedCost : null;
+    const promoMarginPct   = promoMargin !== null && promoDLVD > 0 ? (promoMargin/promoDLVD*100) : null;
+    const breakEvenLanded  = landedCost > 0 && normalDLVD > 0
+      ? promoDLVD - (normalDLVD - landedCost)
+      : null;
+    const marginOk = promoMarginPct !== null && promoMarginPct >= 0;
+    const marginAlert = promoMarginPct !== null
+      ? `<div style="font-size:11px;padding:5px 8px;border-radius:var(--r-md);background:${marginOk?'var(--green-bg)':'var(--red-bg)'};color:${marginOk?'var(--green-text)':'var(--red-text)'};border-left:3px solid ${marginOk?'var(--green)':'var(--red)'};margin-top:6px">
+          ${marginOk
+            ? `✓ Margin at ${promoMarginPct.toFixed(1)}%. Need landed cost ≤ $${breakEvenLanded!==null?breakEvenLanded.toFixed(2):'—'}/cs.`
+            : `⚠ Negative margin at promo price. Requires landed cost renegotiation.`}
+        </div>` : '';
+    const d=document.createElement('div');
+    d.className='approval-card';d.id='si-'+item.id;
+    d.innerHTML=`<div style="font-weight:500;font-size:13px;margin-bottom:8px">Item ${idx+1}: ${item.name||'(unnamed)'}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;font-size:12px">
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:6px 8px">
+        <div style="font-size:10px;color:var(--text3)">NORMAL VOL</div>
+        <div style="font-weight:500">${normalVol} cs/wk</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:6px 8px">
+        <div style="font-size:10px;color:var(--text3)">PROMO LIFT</div>
+        <div style="font-weight:500;color:var(--blue)">+${promoLift} cs</div>
+      </div>
+      <div style="background:var(--blue-bg);border-radius:var(--r-md);padding:6px 8px;border:0.5px solid var(--blue)">
+        <div style="font-size:10px;color:var(--blue-text)">PROMO VOL TOTAL</div>
+        <div style="font-weight:500;color:var(--blue-text)">${promoVol} cs/wk</div>
+      </div>
+      <div style="background:${landedCost>0?(marginOk?'var(--green-bg)':'var(--red-bg)'):'var(--bg3)'};border-radius:var(--r-md);padding:6px 8px">
+        <div style="font-size:10px;color:var(--text3)">PROMO MARGIN/CS</div>
+        <div style="font-weight:500;color:${promoMargin!==null?(marginOk?'var(--green)':'var(--red)'):'var(--text3)'}">
+          ${promoMargin!==null?'$'+promoMargin.toFixed(2)+(promoMarginPct!==null?' ('+promoMarginPct.toFixed(1)+'%)':''):'Enter landed cost'}
+        </div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">
+      Normal DLVD <strong style="color:var(--text)">$${normalDLVD.toFixed(2)}</strong> &nbsp;→&nbsp;
+      Promo DLVD <strong style="color:var(--text)">$${promoDLVD.toFixed(2)}</strong> &nbsp;|&nbsp;
+      Landed cost <strong style="color:var(--amber-text)">${landedCost>0?'$'+landedCost.toFixed(2):' not entered'}</strong>
+    </div>
+    ${marginAlert}
+    <div class="radio-row" style="margin-top:10px">
+      <label><input type="radio" name="sup-${item.id}" value="Yes" onchange="updateSupDec(${item.id},'Yes')"> <span style="color:var(--green);font-weight:500">Approve</span></label>
+      <label><input type="radio" name="sup-${item.id}" value="No" onchange="updateSupDec(${item.id},'No')"> <span style="color:var(--red);font-weight:500">Decline</span></label>
+    </div>`;
+    c.appendChild(d);
+  });
+}
+
+function updateSupDec(id,val){
+  state.supplyDecisions[id]=val;
+  const el=document.getElementById('si-'+id);
+  if(el){el.className='approval-card '+(val==='Yes'?'approved':'declined')}
+}
+
+function submitToFreight(){
+  if(!v('supplyReviewer')){showToast('Enter supply reviewer name.','var(--amber)');return}
+  renderFreightSummary();
+  goTab(2);
+  queueEmail('freight',{stage:'freight',retailer:v('retailer'),supplyReviewer:v('supplyReviewer'),items:state.items,decisions:state.supplyDecisions});
+  showToast('Forwarded to Freight department');
+}
+
+function renderFreightSummary(){
+  const c=document.getElementById('freight-summary');c.innerHTML='';
+  [['Retailer',v('retailer')],['Ad break date',v('adBreak')],['Supply reviewer',v('supplyReviewer')]].forEach(([l,val])=>{
+    const d=document.createElement('div');d.className='summary-row';
+    d.innerHTML=`<span class="summary-label">${l}</span><span class="summary-val">${val||'—'}</span>`;c.appendChild(d);
+  });
+  state.items.forEach((item,idx)=>{
+    const dec=state.supplyDecisions[item.id];
+    const badge=dec==='Yes'?'<span class="badge badge-green">Supply approved</span>':dec==='No'?'<span class="badge badge-red">Supply declined</span>':'<span class="badge badge-gray">Pending</span>';
+    const d=document.createElement('div');
+    d.style.cssText='margin-top:8px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border);font-size:13px;display:flex;justify-content:space-between;align-items:center';
+    d.innerHTML=`<span>${item.name||'Item '+(idx+1)}</span>${badge}`;c.appendChild(d);
+  });
+}
+
+function submitToPerformance(){
+  if(!v('freightReviewer')){showToast('Enter freight reviewer name.','var(--amber)');return}
+  renderPerfSummary();
+  goTab(3);
+  queueEmail('performance',{stage:'performance',retailer:v('retailer'),freightReviewer:v('freightReviewer'),deliveryWindow:v('deliveryWindow'),freightCost:v('freightCost'),items:state.items,decisions:state.supplyDecisions});
+  showToast('Forwarded to Performance department');
+}
+
+function renderPerfSummary(){
+  const c=document.getElementById('perf-summary');c.innerHTML='';
+  const fields=[['Submitted by',v('submittedBy')],['Retailer',v('retailer')],['Distributor',v('distributor')||'—'],['Ad break date',v('adBreak')],['Start / stop ship',v('adStart')+' – '+v('adStop')],['Supply reviewer',v('supplyReviewer')],['Freight reviewer',v('freightReviewer')],['Delivery window',v('deliveryWindow')||'—'],['Freight cost est.',v('freightCost')?'$'+parseFloat(v('freightCost')).toFixed(2):'—']];
+  fields.forEach(([l,val])=>{
+    const d=document.createElement('div');d.className='summary-row';
+    d.innerHTML=`<span class="summary-label">${l}</span><span class="summary-val">${val}</span>`;c.appendChild(d);
+  });
+  const h=document.createElement('div');h.style.cssText='font-size:11px;font-weight:500;color:var(--text3);margin:12px 0 6px;letter-spacing:0.03em';h.textContent='PROMOTIONAL ITEMS';c.appendChild(h);
+  state.items.forEach((item,idx)=>{
+    const dec=state.supplyDecisions[item.id];
+    const badge=dec==='Yes'?'<span class="badge badge-green">Supply ✓</span>':'<span class="badge badge-amber">Not supply approved</span>';
+    const d=document.createElement('div');
+    d.style.cssText='margin-bottom:6px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border);font-size:12px;display:flex;justify-content:space-between;align-items:center';
+    const pv=(+item.normalVol||0)+(+item.promoLift||0);
+    d.innerHTML=`<span><strong style="font-weight:500">${item.name||'Item '+(idx+1)}</strong> — ${+item.normalVol||0} + ${+item.promoLift||0} = <strong>${pv} cs</strong> promo vol &nbsp;|&nbsp; DLVD $${(+item.promoDLVD||0).toFixed(2)}</span>${badge}`;c.appendChild(d);
+  });
+}
+
+function finalizeRequest(){
+  const dec=document.querySelector('input[name="finalDecision"]:checked');
+  if(!v('perfReviewer')){showToast('Enter performance reviewer name.','var(--amber)');return}
+  if(!dec){showToast('Select Approved or Declined.','var(--amber)');return}
+  const approved=dec.value==='approved';
+
+  const req={
+    id:'REQ-'+Date.now(),
+    submittedAt:new Date().toISOString(),
+    submittedBy:v('submittedBy'),submitterEmail:v('submitterEmail'),
+    retailer:v('retailer'),distributor:v('distributor'),
+    adBreak:v('adBreak'),adStart:v('adStart'),adStop:v('adStop'),
+    feedbackBy:v('feedbackBy'),customerBy:v('customerBy'),
+    supplyReviewer:v('supplyReviewer'),supplyEmail:v('supplyEmail'),
+    supplierName:v('supplierName'),varietyStyle:v('varietyStyle'),inRacksCost:v('inRacksCost'),
+    freightReviewer:v('freightReviewer'),freightEmail:v('freightEmail'),
+    deliveryWindow:v('deliveryWindow'),carrier:v('carrier'),freightCost:v('freightCost'),
+    perfReviewer:v('perfReviewer'),perfEmail:v('perfEmail'),
+    productId:v('productId'),perfNotes:v('perfNotes'),
+    salesNotes:v('salesNotes'),supplyNotes:v('supplyNotes'),freightNotes:v('freightNotes'),
+    // Ensure promoVol = normalVol + promoLift is baked into saved items
+    items:JSON.parse(JSON.stringify(state.items)).map(i=>({...i,promoVol:(+i.normalVol||0)+(+i.promoLift||0)})),
+    supplyDecisions:JSON.parse(JSON.stringify(state.supplyDecisions)),
+    status:approved?'approved':'declined',
+    freightDecision:document.querySelector('input[name="freightDecision"]:checked')?.value||''
+  };
+  currentRequest=req;
+  allRequests.unshift(req);
+  localStorage.setItem('adRequests',JSON.stringify(allRequests));
+
+  for(let i=0;i<4;i++){document.getElementById('stage-'+i).style.display='none'}
+  document.getElementById('stage-complete').style.display='block';
+  for(let i=0;i<4;i++){document.getElementById('tab-'+i).className='stage-step '+(approved?'done':'declined')}
+
+  document.getElementById('final-icon').textContent=approved?'✅':'❌';
+  document.getElementById('final-title').textContent=approved?'Ad request approved':'Ad request declined';
+  document.getElementById('final-title').style.color=approved?'var(--green)':'var(--red)';
+  document.getElementById('final-sub').textContent=approved?'All four departments have signed off.':'Performance department has declined this request.';
+
+  const d=document.getElementById('final-detail');
+  d.innerHTML=`<div style="background:var(--bg2);border-radius:var(--r-md);padding:1rem">
+    <div class="summary-row"><span class="summary-label">Request ID</span><span class="summary-val">${req.id}</span></div>
+    <div class="summary-row"><span class="summary-label">Retailer</span><span class="summary-val">${req.retailer}</span></div>
+    <div class="summary-row"><span class="summary-label">Items</span><span class="summary-val">${req.items.map(i=>i.name||'—').join(', ')}</span></div>
+    <div class="summary-row"><span class="summary-label">Sales → Supply → Freight → Performance</span><span class="summary-val">${req.submittedBy} → ${req.supplyReviewer} → ${req.freightReviewer} → ${req.perfReviewer}</span></div>
+    <div class="summary-row"><span class="summary-label">Decision</span><span class="summary-val" style="color:${approved?'var(--green)':'var(--red)'}">${approved?'APPROVED':'DECLINED'} by ${req.perfReviewer}</span></div>
+  </div>`;
+
+  queueEmail('final',{stage:'final',req});
+  showToast(approved?'Request fully approved!':'Request declined by Performance.',approved?'var(--green)':'var(--red)');
+}
+
+function resetForm(){
+  state={items:[],supplyDecisions:{},nextId:1};
+  document.querySelectorAll('#page-form input[type=text],#page-form input[type=email],#page-form input[type=number],#page-form textarea').forEach(el=>el.value='');
+  document.querySelectorAll('#page-form select').forEach(el=>el.selectedIndex=0);
+  document.querySelectorAll('#page-form input[type=radio]').forEach(el=>el.checked=false);
+  addItem(false);
+  goTab(0);
+  setDateDefaults();
+}
+
+/* §JS-EXCEL — Excel export via SheetJS (xlsx 0.18.5)
+   ──────────────────────────────────────────────────
+   buildExcelData(reqs) — normalizes to flat rows; 39 columns in v2:
+     Request ID | Date | Retailer | Distributor | Submitted By | Status |
+     Ad Break | Start Ship | Stop Ship | Item |
+     Normal Vol | Promo Lift | Promo Vol Total | Lift % |        ← v2 fields
+     Landed Cost/cs | Normal FOB | Normal DLVD | Normal Revenue |← v2 fields
+     Promo FOB | Promo DLVD | Promo Revenue | Revenue Change |
+     Normal Margin/cs | Normal Margin % |                        ← v2 fields
+     Promo Margin/cs | Promo Margin % | Break-Even Landed |      ← v2 fields
+     Pre-Approved | Customer Requested | Supply Decision |
+     Supply Reviewer | Supplier Name | In-Racks Cost |
+     Freight Reviewer | Delivery Window | Carrier | Freight Cost |
+     Perf Reviewer | Product ID | Perf Notes
+
+   exportAllToExcel() — multi-sheet workbook:
+     Sheet 1: All requests (flat)
+     Sheets 2–N: One sheet per retailer (same columns)
+     Last sheet: Summary by customer (counts + promo value)
+
+   TODO: Add "Weekly Calendar" sheet — product × week conflict grid
+   REFACTOR: buildExcelData() called twice per customer tab (inefficient) — cache rows */
+function buildExcelData(reqs){
+  const rows=[];
+  rows.push(['Request ID','Date','Retailer','Distributor','Submitted By','Status','Ad Break','Start Ship','Stop Ship',
+    'Item','Normal Vol (cs/wk)','Promo Lift (cs)','Promo Vol Total (cs)','Lift %',
+    'Landed Cost/cs','Normal FOB','Normal DLVD','Normal Revenue',
+    'Promo FOB','Promo DLVD','Promo Revenue','Revenue Change',
+    'Normal Margin/cs','Normal Margin %','Promo Margin/cs','Promo Margin %','Break-Even Landed',
+    'Pre-Approved','Customer Requested','Supply Decision',
+    'Supply Reviewer','Supplier Name','In-Racks Cost',
+    'Freight Reviewer','Delivery Window','Carrier','Freight Cost',
+    'Perf Reviewer','Product ID','Perf Notes']);
+  reqs.forEach(r=>{
+    const items=r.items&&r.items.length?r.items:[{name:'',normalVol:'',promoLift:'',promoVol:'',landedCost:'',normalFOB:'',normalDLVD:'',promoFOB:'',promoDLVD:'',preApproved:'',customerRequest:''}];
+    items.forEach(item=>{
+      const nv = +item.normalVol  || 0;
+      const pl = +item.promoLift  || 0;
+      const pv = nv + pl;                               // promoVol = normalVol + promoLift
+      const lc = +item.landedCost || 0;
+      const nd = +item.normalDLVD || 0;
+      const pd = +item.promoDLVD  || 0;
+      const nr = nv * nd;
+      const pr = pv * pd;
+      const nm = lc > 0 ? nd - lc : '';
+      const nmPct = (lc > 0 && nd > 0) ? ((nd-lc)/nd*100).toFixed(1)+'%' : '';
+      const pm = lc > 0 ? pd - lc : '';
+      const pmPct = (lc > 0 && pd > 0) ? ((pd-lc)/pd*100).toFixed(1)+'%' : '';
+      const bel = (lc > 0 && nd > 0) ? (pd - (nd - lc)).toFixed(2) : '';
+      const liftPct = nv > 0 ? (pl/nv*100).toFixed(1)+'%' : '';
+      const supDec = r.supplyDecisions&&r.supplyDecisions[item.id]?r.supplyDecisions[item.id]:'';
+      rows.push([
+        r.id, r.submittedAt?r.submittedAt.split('T')[0]:'', r.retailer, r.distributor, r.submittedBy, r.status,
+        r.adBreak, r.adStart, r.adStop,
+        item.name, nv, pl, pv, liftPct,
+        lc||'', item.normalFOB, nd, nr.toFixed(2),
+        item.promoFOB, pd, pr.toFixed(2), (pr-nr).toFixed(2),
+        nm!==''?nm.toFixed(2):'', nmPct,
+        pm!==''?pm.toFixed(2):'', pmPct, bel,
+        item.preApproved, item.customerRequest, supDec,
+        r.supplyReviewer, r.supplierName, r.inRacksCost,
+        r.freightReviewer, r.deliveryWindow, r.carrier, r.freightCost,
+        r.perfReviewer, r.productId, r.perfNotes
+      ]);
+    });
+  });
+  return rows;
+}
+
+function exportAllToExcel(){
+  if(!allRequests.length){showToast('No requests to export.','var(--amber)');return}
+  const wb=XLSX.utils.book_new();
+  const rows=buildExcelData(allRequests);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=rows[0].map(()=>({wch:18}));
+  XLSX.utils.book_append_sheet(wb,ws,'All Requests');
+
+  const byCustomer={};
+  allRequests.forEach(r=>{
+    if(!byCustomer[r.retailer])byCustomer[r.retailer]=[];
+    byCustomer[r.retailer].push(r);
+  });
+  Object.entries(byCustomer).forEach(([cust,reqs])=>{
+    const name=cust.replace(/[^a-zA-Z0-9 ]/g,'').substring(0,28);
+    const cws=XLSX.utils.aoa_to_sheet(buildExcelData(reqs));
+    cws['!cols']=buildExcelData(reqs)[0].map(()=>({wch:18}));
+    XLSX.utils.book_append_sheet(wb,cws,name||'Customer');
+  });
+
+  const sumRows=[['Customer','Total Requests','Approved','Declined','Pending','Total Promo Value ($)']];
+  Object.entries(byCustomer).forEach(([cust,reqs])=>{
+    const approved=reqs.filter(r=>r.status==='approved').length;
+    const declined=reqs.filter(r=>r.status==='declined').length;
+    const pending=reqs.filter(r=>!r.status||r.status==='pending').length;
+    const total=reqs.reduce((s,r)=>s+(r.items||[]).reduce((ss,i)=>ss+(+i.promoVol||0)*(+i.promoDLVD||0),0),0);
+    sumRows.push([cust,reqs.length,approved,declined,pending,total.toFixed(2)]);
+  });
+  const sws=XLSX.utils.aoa_to_sheet(sumRows);sws['!cols']=sumRows[0].map(()=>({wch:20}));
+  XLSX.utils.book_append_sheet(wb,sws,'Summary by Customer');
+
+  XLSX.writeFile(wb,'Ad_Requests_'+new Date().toISOString().split('T')[0]+'.xlsx');
+  showToast('Excel file exported!');
+}
+
+function exportSingleExcel(){
+  if(!currentRequest){showToast('No current request.','var(--amber)');return}
+  const wb=XLSX.utils.book_new();
+  const rows=buildExcelData([currentRequest]);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=rows[0].map(()=>({wch:18}));
+  XLSX.utils.book_append_sheet(wb,ws,'Request');
+  XLSX.writeFile(wb,'AdRequest_'+currentRequest.retailer.replace(/\s/g,'_')+'_'+currentRequest.adBreak+'.xlsx');
+  showToast('Request exported to Excel!');
+}
+
+/* §JS-EMAIL — Email notification system
+   ⚠️  SIMULATION ONLY — no real SMTP. "Send" writes to localStorage.
+
+   TO CONNECT REAL EMAIL:
+   1. Replace sendAllEmails() body with a fetch() POST to your backend:
+      fetch('/api/send-email', { method:'POST', body: JSON.stringify(pendingEmails) })
+   2. Backend (Node/Express or serverless) calls SendGrid, Mailgun, or SES
+   3. Keep API keys server-side — never in this file
+
+   TODO: Allow editing email body before sending (not just preview)
+   TODO: Persist pendingEmails to localStorage so refresh doesn't lose drafts
+   TODO: Add CC support in queueEmail() — cfg.ccEmail is stored but not used */
+let pendingEmails=[];
+
+function queueEmail(type,data){
+  const cfg=JSON.parse(localStorage.getItem('emailConfig')||'{}');
+  let to='',subject='',body='';
+  if(type==='supply'){
+    to=cfg.supplyEmail||'supply-team@company.com';
+    subject=`Ad Request for Review — ${data.retailer} (Ad Break: ${data.adBreak})`;
+    body=`Hi Supply Team,\n\nA new ad request has been submitted and requires your review.\n\nSubmitted by: ${data.submitter}\nRetailer: ${data.retailer}\nAd break date: ${data.adBreak}\n\nItems:\n${data.items.map((i,n)=>`  ${n+1}. ${i.name||'TBD'} — Normal vol: ${i.normalVol} cs, Normal DLVD: $${i.normalDLVD}, Promo DLVD: $${i.promoDLVD}`).join('\n')}\n\nPlease log into the Ad Request Workflow to review and approve or decline each item, then forward to Freight.\n\nThank you.`;
+  } else if(type==='freight'){
+    to=cfg.freightEmail||'freight-team@company.com';
+    subject=`Ad Request — Freight Review Needed — ${data.retailer}`;
+    body=`Hi Freight Team,\n\nAn ad request has been approved by Supply and is ready for freight review.\n\nRetailer: ${data.retailer}\nSupply reviewer: ${data.supplyReviewer}\n\nItems approved by Supply:\n${data.items.filter(i=>data.decisions[i.id]==='Yes').map((i,n)=>`  ${n+1}. ${i.name||'TBD'}`).join('\n')||'  (none approved yet)'}\n\nPlease confirm delivery windows, carrier details, and freight cost estimates, then forward to Performance.\n\nThank you.`;
+  } else if(type==='performance'){
+    to=cfg.perfEmail||'performance@company.com';
+    subject=`Ad Request — Final Approval Needed — ${data.retailer}`;
+    body=`Hi Performance Team,\n\nAn ad request has cleared Supply and Freight review and requires your final approval.\n\nRetailer: ${data.retailer}\nFreight reviewer: ${data.freightReviewer}\nDelivery window: ${data.deliveryWindow||'TBD'}\nFreight cost estimate: ${data.freightCost?'$'+data.freightCost:'TBD'}\n\nItems:\n${data.items.map((i,n)=>`  ${n+1}. ${i.name||'TBD'} — Supply: ${data.decisions[i.id]||'pending'}`).join('\n')}\n\nPlease log into the Ad Request Workflow to issue the final decision.\n\nThank you.`;
+  } else if(type==='final'){
+    const r=data.req;const approved=r.status==='approved';
+    to=[r.submitterEmail,r.supplyEmail,r.freightEmail,r.perfEmail].filter(Boolean).join(', ')||'all-departments@company.com';
+    subject=`Ad Request ${approved?'APPROVED':'DECLINED'} — ${r.retailer} (${r.adBreak})`;
+    body=`Hi all,\n\nThe ad request for ${r.retailer} has been ${approved?'APPROVED':'DECLINED'} by Performance.\n\nRequest ID: ${r.id}\nRetailer: ${r.retailer}\nAd break date: ${r.adBreak}\nFinal decision: ${r.status.toUpperCase()} by ${r.perfReviewer}\n\nItems:\n${r.items.map((i,n)=>`  ${n+1}. ${i.name||'TBD'}`).join('\n')}\n${r.perfNotes?'\nNotes: '+r.perfNotes:''}\n\nThank you to all departments for their timely review.\n\nAd Request Workflow System`;
+  }
+  pendingEmails.push({type,to,subject,body,time:new Date().toISOString()});
+}
+
+function previewEmailDraft(){
+  if(!pendingEmails.length){showToast('No pending emails.','var(--amber)');return}
+  const panel=document.getElementById('email-draft-panel');
+  const container=document.getElementById('email-drafts');
+  container.innerHTML='';
+  pendingEmails.forEach((em,i)=>{
+    const d=document.createElement('div');d.style.cssText='margin-bottom:1rem';
+    d.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2)">To: ${em.to}</div>
+      <span class="badge badge-blue">${em.type}</span>
+    </div>
+    <div style="font-size:12px;font-weight:500;margin-bottom:4px">${em.subject}</div>
+    <div class="email-preview">${em.body.replace(/\n/g,'<br>')}</div>`;
+    container.appendChild(d);
+  });
+  panel.style.display='block';
+  showPage('email');
+}
+
+function sendAllEmails(){
+  emailLog=[...pendingEmails.map(e=>({...e,sent:true,sentAt:new Date().toISOString()})),...emailLog].slice(0,50);
+  localStorage.setItem('emailLog',JSON.stringify(emailLog));
+  pendingEmails=[];
+  document.getElementById('email-draft-panel').style.display='none';
+  renderEmailLog();
+  showToast('All notifications sent!');
+}
+
+function saveEmailConfig(){
+  const cfg={supplyEmail:v('cfg-supplyEmail'),freightEmail:v('cfg-freightEmail'),perfEmail:v('cfg-perfEmail'),ccEmail:v('cfg-ccEmail')};
+  localStorage.setItem('emailConfig',JSON.stringify(cfg));
+  showToast('Email settings saved!');
+}
+
+function renderEmailConfig(){
+  const cfg=JSON.parse(localStorage.getItem('emailConfig')||'{}');
+  ['supplyEmail','freightEmail','perfEmail','ccEmail'].forEach(k=>{
+    const el=document.getElementById('cfg-'+k);if(el&&cfg[k])el.value=cfg[k];
+  });
+  renderEmailLog();
+}
+
+function renderEmailLog(){
+  const c=document.getElementById('email-log-content');
+  const log=JSON.parse(localStorage.getItem('emailLog')||'[]');
+  if(!log.length){c.innerHTML='<div style="color:var(--text3);font-size:13px">No notifications sent yet.</div>';return}
+  c.innerHTML=log.slice(0,10).map(e=>`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+      <span style="font-weight:500;font-size:13px">${e.subject}</span>
+      <span class="badge badge-green">Sent</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3)">To: ${e.to} &nbsp;·&nbsp; ${e.sentAt?new Date(e.sentAt).toLocaleString():''}</div>
+  </div>`).join('');
+}
+
+// ===== DASHBOARD =====
+/* §JS-DASHBOARD — Dashboard metrics, chart rendering, recent requests table
+   PERF NOTE: switchDashTab() re-reads localStorage on every tab click.
+   With >500 requests this may be slow — cache in allRequests instead. */
+function renderDashboard(){
+  const reqs=JSON.parse(localStorage.getItem('adRequests')||'[]');
+  const total=reqs.length;
+  const approved=reqs.filter(r=>r.status==='approved').length;
+  const declined=reqs.filter(r=>r.status==='declined').length;
+  const totalPromo=reqs.reduce((s,r)=>s+(r.items||[]).reduce((ss,i)=>ss+(+i.promoVol||0)*(+i.promoDLVD||0),0),0);
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metric-card"><div class="metric-label">TOTAL REQUESTS</div><div class="metric-value">${total}</div></div>
+    <div class="metric-card"><div class="metric-label">APPROVED</div><div class="metric-value" style="color:var(--green)">${approved}</div><div class="metric-sub">${total?Math.round(approved/total*100):0}% approval rate</div></div>
+    <div class="metric-card"><div class="metric-label">DECLINED</div><div class="metric-value" style="color:var(--red)">${declined}</div></div>
+    <div class="metric-card"><div class="metric-label">TOTAL PROMO SALES</div><div class="metric-value">$${totalPromo.toLocaleString('en-US',{maximumFractionDigits:0})}</div></div>`;
+  renderDashChart(currentDashTab,reqs);
+  renderDashTable(reqs);
+}
+
+function switchDashTab(tab,el){
+  currentDashTab=tab;
+  document.querySelectorAll('.dept-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const reqs=JSON.parse(localStorage.getItem('adRequests')||'[]');
+  renderDashChart(tab,reqs);
+}
+
+const COLORS=['#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517','#D4537E','#639922','#E24B4A'];
+
+function renderDashChart(tab,reqs){
+  if(dashChart){dashChart.destroy();dashChart=null}
+  let labels=[],data=[],colors=[];
+  if(tab==='customer'){
+    const map={};reqs.forEach(r=>{map[r.retailer]=(map[r.retailer]||0)+1});
+    labels=Object.keys(map);data=Object.values(map);
+  } else if(tab==='product'){
+    const map={};reqs.forEach(r=>(r.items||[]).forEach(i=>{if(i.name)map[i.name]=(map[i.name]||0)+1}));
+    const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    labels=sorted.map(e=>e[0].length>30?e[0].substring(0,28)+'…':e[0]);data=sorted.map(e=>e[1]);
+  } else {
+    const map={approved:0,declined:0,pending:0};
+    reqs.forEach(r=>map[r.status||'pending']=(map[r.status||'pending']||0)+1);
+    labels=['Approved','Declined','Pending'];data=[map.approved,map.declined,map.pending];colors=['#639922','#E24B4A','#BA7517'];
+  }
+  if(!labels.length){document.getElementById('dash-legend').innerHTML='<span style="color:var(--text3);font-size:12px">No data yet — submit a request to see charts.</span>';return}
+  colors=labels.map((_,i)=>COLORS[i%COLORS.length]);
+  document.getElementById('dash-legend').innerHTML=labels.map((l,i)=>`<span style="display:flex;align-items:center;gap:4px"><span class="legend-swatch" style="background:${colors[i]}"></span>${l}: ${data[i]}</span>`).join('');
+  const isHBar=tab==='product';
+  const wrapHeight=isHBar?Math.max(280,labels.length*36+80):260;
+  document.querySelector('.chart-wrap-tall').style.height=wrapHeight+'px';
+  const ctx=document.getElementById('dashChart');
+  dashChart=new Chart(ctx,{
+    type:isHBar?'bar':'bar',
+    data:{labels,datasets:[{label:'Count',data,backgroundColor:colors,borderWidth:0}]},
+    options:{indexAxis:isHBar?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.raw}}},scales:{x:{ticks:{color:'#9b9b97',font:{size:11}}},y:{ticks:{color:'#9b9b97',font:{size:11}}}}}
+  });
+}
+
+function renderDashTable(reqs){
+  const c=document.getElementById('dash-table');
+  if(!reqs.length){c.innerHTML='<div style="color:var(--text3);padding:1rem 0;font-size:13px">No requests yet.</div>';return}
+  const recent=reqs.slice(0,8);
+  c.innerHTML=`<table><thead><tr><th>Request ID</th><th>Retailer</th><th>Items</th><th>Ad break</th><th>Status</th></tr></thead><tbody>
+    ${recent.map(r=>`<tr><td style="font-size:11px;color:var(--text3)">${r.id}</td><td>${r.retailer}</td><td>${(r.items||[]).length} item(s)</td><td>${r.adBreak||'—'}</td><td><span class="badge ${r.status==='approved'?'badge-green':r.status==='declined'?'badge-red':'badge-amber'}">${r.status||'pending'}</span></td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* §JS-LOG — Request log: search, filter, table render
+   TODO: Add debounce (~200ms) to the oninput search handler
+   TODO: Add column sort (click header to sort by date, retailer, status) */
+function renderLog(){
+  const reqs=JSON.parse(localStorage.getItem('adRequests')||'[]');
+  const search=v('logSearch').toLowerCase();
+  const filter=v('logFilter');
+  const filtered=reqs.filter(r=>{
+    const matchSearch=!search||(r.retailer||'').toLowerCase().includes(search)||(r.items||[]).some(i=>(i.name||'').toLowerCase().includes(search));
+    const matchFilter=!filter||r.status===filter;
+    return matchSearch&&matchFilter;
+  });
+  const c=document.getElementById('log-table');
+  if(!filtered.length){c.innerHTML='<div style="color:var(--text3);padding:1rem 0;font-size:13px">No matching requests.</div>';return}
+  c.innerHTML=`<table><thead><tr><th>ID</th><th>Date</th><th>Retailer</th><th>Submitted by</th><th>Items</th><th>Ad break</th><th>Supply</th><th>Freight</th><th>Performance</th><th>Status</th></tr></thead><tbody>
+    ${filtered.map(r=>`<tr>
+      <td style="font-size:11px;color:var(--text3)">${r.id}</td>
+      <td style="font-size:11px">${r.submittedAt?r.submittedAt.split('T')[0]:'—'}</td>
+      <td>${r.retailer}</td>
+      <td>${r.submittedBy}</td>
+      <td style="font-size:11px">${(r.items||[]).map(i=>i.name||'—').join(', ').substring(0,40)}</td>
+      <td style="font-size:11px">${r.adBreak||'—'}</td>
+      <td style="font-size:11px">${r.supplyReviewer||'—'}</td>
+      <td style="font-size:11px">${r.freightReviewer||'—'}</td>
+      <td style="font-size:11px">${r.perfReviewer||'—'}</td>
+      <td><span class="badge ${r.status==='approved'?'badge-green':r.status==='declined'?'badge-red':'badge-amber'}">${r.status||'pending'}</span></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* §JS-WEEKLY — Weekly ad calendar: date utilities, grid builders, volume chart
+   ─────────────────────────────────────────────────────────────────────────────
+   itemPromoVol(item) — KEY HELPER (v2):
+     Returns normalVol + promoLift if promoLift > 0 (new records)
+     Falls back to stored item.promoVol for legacy records without promoLift
+     Used in ALL volume calculations across customer grid, product grid,
+     conflict grid, totals rows, drill-down detail, and volume chart.
+
+   WEEK CONVENTION: Weeks start on Monday (ISO). Adjust getMonday() offset
+   if the business uses Sunday-start weeks.
+
+   THREE GRID VIEWS:
+   - renderCustomerGrid()  rows=customers, cols=weeks, cells=items+vol
+   - renderProductGrid()   rows=products,  cols=weeks, cells=customers+vol
+   - renderConflictGrid()  same-product/same-week conflicts highlighted red
+
+   showWeekDetail() — drill-down table now includes: Normal Vol, Promo Lift,
+   Promo Vol, Landed Cost, Promo DLVD, Margin/cs (green/red), Week Sales
+
+   PERF NOTE: All grid renderers do O(requests × items × weeks) iterations.
+   Pre-index into maps in buildWeeklyData() if data volume grows past ~100 requests.
+
+   TODO: Export calendar view to Excel (product × week matrix)
+   TODO: Allow filtering calendar by specific customer or product
+   TODO: Show normal vs. promo vol comparison bars in volume chart */
+let wkOffset = 0;
+let wkView = 'customer';
+let wkVolChart = null;
+
+const CUST_COLORS = ['#185FA5','#1D9E75','#D85A30','#7F77DD','#BA7517','#D4537E','#3B6D11','#E24B4A','#0F6E56','#993C1D'];
+const PROD_COLORS = ['#378ADD','#5DCAA5','#F0997B','#AFA9EC','#EF9F27','#ED93B1','#97C459','#F09595','#9FE1CB','#F5C4B3'];
+
+function getMonday(d){const x=new Date(d);const day=x.getDay();const diff=x.getDate()-day+(day===0?-6:1);x.setDate(diff);x.setHours(0,0,0,0);return x;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function fmtDate(d){return d.toISOString().split('T')[0];}
+function fmtWeekLabel(d){const m=d.toLocaleString('en-US',{month:'short'});return m+' '+d.getDate();}
+function parseDate(s){if(!s)return null;const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+
+function getAdWeeks(req, item){
+  const start = parseDate(req.adStart||req.adBreak);
+  const stop  = parseDate(req.adStop||req.adBreak);
+  if(!start||!stop) return [];
+  const weeks=[];
+  let cur = getMonday(start);
+  const end = getMonday(stop);
+  while(cur<=end){weeks.push(fmtDate(cur));cur=addDays(cur,7);}
+  return weeks;
+}
+
+function itemPromoVol(item){
+  // Always derive promoVol from normalVol + promoLift; fall back to stored promoVol for legacy records
+  const nv = +item.normalVol || 0;
+  const pl = +item.promoLift || 0;
+  return pl > 0 ? nv + pl : (+item.promoVol || 0);
+}
+
+function buildWeeklyData(){
+  const reqs = JSON.parse(localStorage.getItem('adRequests')||'[]').filter(r=>r.status==='approved');
+  const weekSet = new Set();
+  reqs.forEach(r=>(r.items||[]).forEach(item=>{
+    getAdWeeks(r,item).forEach(w=>weekSet.add(w));
+  }));
+  const weeks = Array.from(weekSet).sort();
+  return {reqs, weeks};
+}
+
+function shiftWeeks(n){ wkOffset+=n; renderWeeklyCalendar(); }
+function resetWeekView(){ wkOffset=0; renderWeeklyCalendar(); }
+function switchWeekView(v,el){
+  wkView=v;
+  document.querySelectorAll('#wk-view-tabs .dept-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderWeeklyCalendar();
+}
+
+function renderWeeklyCalendar(){
+  const {reqs, weeks} = buildWeeklyData();
+  const today = fmtDate(getMonday(new Date()));
+
+  let allWeeks = weeks;
+  if(!allWeeks.length){
+    // show 8 weeks from today if no data
+    allWeeks=[];let cur=getMonday(new Date());
+    for(let i=0;i<8;i++){allWeeks.push(fmtDate(cur));cur=addDays(cur,7);}
+  }
+
+  const PAGE=8;
+  const startIdx = Math.max(0, allWeeks.indexOf(today)+wkOffset);
+  const clampedStart = Math.min(Math.max(0,startIdx), Math.max(0,allWeeks.length-PAGE));
+  const visWeeks = allWeeks.slice(clampedStart, clampedStart+PAGE);
+
+  const firstWeek = parseDate(visWeeks[0]);
+  const lastWeek  = addDays(parseDate(visWeeks[visWeeks.length-1]),6);
+  document.getElementById('wk-range-label').textContent =
+    fmtWeekLabel(firstWeek)+' – '+fmtWeekLabel(lastWeek)+', '+lastWeek.getFullYear();
+
+  if(wkView==='customer') renderCustomerGrid(reqs, visWeeks, today);
+  else if(wkView==='product') renderProductGrid(reqs, visWeeks, today);
+  else renderConflictGrid(reqs, visWeeks, today);
+
+  renderVolChart(reqs, visWeeks);
+}
+
+function renderCustomerGrid(reqs, visWeeks, today){
+  const customers=[...new Set(reqs.map(r=>r.retailer))].sort();
+  const colorMap={};customers.forEach((c,i)=>colorMap[c]=CUST_COLORS[i%CUST_COLORS.length]);
+
+  // Build legend
+  document.getElementById('wk-legend').innerHTML=customers.map(c=>
+    `<span style="display:flex;align-items:center;gap:4px"><span class="legend-swatch" style="background:${colorMap[c]}"></span>${c}</span>`).join('');
+
+  // Build data: customer → week → [{item, promoVol}]
+  const data={};
+  customers.forEach(c=>data[c]={});
+  reqs.forEach(r=>{
+    (r.items||[]).forEach(item=>{
+      getAdWeeks(r,item).forEach(w=>{
+        if(!data[r.retailer][w]) data[r.retailer][w]=[];
+        const pv=itemPromoVol(item);
+        data[r.retailer][w].push({item:item.name,vol:pv,sales:pv*(+item.promoDLVD||0),req:r});
+      });
+    });
+  });
+
+  const grid=document.getElementById('wk-calendar-grid');
+  let html=`<table class="wk-grid"><thead><tr><th class="row-header">Customer</th>`;
+  visWeeks.forEach(w=>{
+    const d=parseDate(w);
+    html+=`<th${w===today?' class="wk-today"':''}>Wk of ${fmtWeekLabel(d)}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
+
+  customers.forEach(c=>{
+    const color=colorMap[c];
+    const bg=color+'22';
+    html+=`<tr><td class="row-header">${c}</td>`;
+    visWeeks.forEach(w=>{
+      const entries=data[c][w]||[];
+      if(!entries.length){html+=`<td><span class="wk-empty">—</span></td>`;return;}
+      const totalVol=entries.reduce((s,e)=>s+e.vol,0);
+      const totalSales=entries.reduce((s,e)=>s+e.sales,0);
+      html+=`<td><div class="wk-cell" style="background:${bg};color:${color};border:1px solid ${color}44"
+        onclick="showWeekDetail('${c}','${w}','customer')" title="${entries.map(e=>e.item+': '+e.vol+' cs').join(', ')}">
+        ${entries.length} item${entries.length>1?'s':''} · ${totalVol} cs
+      </div></td>`;
+    });
+    html+=`</tr>`;
+  });
+
+  // Totals row
+  html+=`<tr class="wk-total-row"><td class="row-header">Total promo vol</td>`;
+  visWeeks.forEach(w=>{
+    let tot=0;
+    reqs.forEach(r=>(r.items||[]).forEach(item=>{
+      if(getAdWeeks(r,item).includes(w)) tot+=itemPromoVol(item);
+    }));
+    html+=`<td style="text-align:center;font-weight:500">${tot>0?tot+' cs':'—'}</td>`;
+  });
+  html+=`</tr></tbody></table>`;
+  grid.innerHTML=html;
+}
+
+function renderProductGrid(reqs, visWeeks, today){
+  const prodSet=new Set();
+  reqs.forEach(r=>(r.items||[]).forEach(i=>{if(i.name)prodSet.add(i.name)}));
+  const products=[...prodSet].sort();
+  const colorMap={};products.forEach((p,i)=>colorMap[p]=PROD_COLORS[i%PROD_COLORS.length]);
+
+  document.getElementById('wk-legend').innerHTML=products.map(p=>
+    `<span style="display:flex;align-items:center;gap:4px"><span class="legend-swatch" style="background:${colorMap[p]}"></span><span style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}</span></span>`).join('');
+
+  // data: product → week → [{customer, vol}]
+  const data={};
+  products.forEach(p=>data[p]={});
+  reqs.forEach(r=>{
+    (r.items||[]).forEach(item=>{
+      if(!item.name) return;
+      getAdWeeks(r,item).forEach(w=>{
+        if(!data[item.name][w]) data[item.name][w]=[];
+        const pv=itemPromoVol(item);
+        data[item.name][w].push({customer:r.retailer,vol:pv,sales:pv*(+item.promoDLVD||0)});
+      });
+    });
+  });
+
+  const grid=document.getElementById('wk-calendar-grid');
+  let html=`<table class="wk-grid"><thead><tr><th class="row-header">Product</th>`;
+  visWeeks.forEach(w=>{
+    const d=parseDate(w);
+    html+=`<th${w===today?' class="wk-today"':''}>Wk of ${fmtWeekLabel(d)}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
+
+  products.forEach(p=>{
+    const color=colorMap[p];
+    const bg=color+'22';
+    const shortName=p.length>36?p.substring(0,34)+'…':p;
+    html+=`<tr><td class="row-header" title="${p}">${shortName}</td>`;
+    visWeeks.forEach(w=>{
+      const entries=data[p][w]||[];
+      if(!entries.length){html+=`<td><span class="wk-empty">—</span></td>`;return;}
+      const custs=[...new Set(entries.map(e=>e.customer))];
+      const totalVol=entries.reduce((s,e)=>s+e.vol,0);
+      html+=`<td><div class="wk-cell" style="background:${bg};color:${color};border:1px solid ${color}44"
+        onclick="showWeekDetail('${p.replace(/'/g,"\\'")}','${w}','product')" title="${custs.join(', ')}: ${totalVol} cs">
+        ${custs.length} cust · ${totalVol} cs
+      </div></td>`;
+    });
+    html+=`</tr>`;
+  });
+
+  html+=`<tr class="wk-total-row"><td class="row-header">Total promo vol</td>`;
+  visWeeks.forEach(w=>{
+    let tot=0;
+    reqs.forEach(r=>(r.items||[]).forEach(item=>{
+      if(getAdWeeks(r,item).includes(w)) tot+=itemPromoVol(item);
+    }));
+    html+=`<td style="text-align:center;font-weight:500">${tot>0?tot+' cs':'—'}</td>`;
+  });
+  html+=`</tr></tbody></table>`;
+  grid.innerHTML=html;
+}
+
+function renderConflictGrid(reqs, visWeeks, today){
+  document.getElementById('wk-legend').innerHTML=
+    `<span style="display:flex;align-items:center;gap:6px"><span class="legend-swatch" style="background:#F09595;border:1px solid #E24B4A"></span>Same product on ad at 2+ customers same week</span>
+     <span style="display:flex;align-items:center;gap:6px;margin-left:16px"><span class="legend-swatch" style="background:#EAF3DE;border:1px solid #639922"></span>Single customer, no conflict</span>`;
+
+  // build: product → week → [customers]
+  const data={};
+  reqs.forEach(r=>{
+    (r.items||[]).forEach(item=>{
+      if(!item.name) return;
+      getAdWeeks(r,item).forEach(w=>{
+        if(!data[item.name]) data[item.name]={};
+        if(!data[item.name][w]) data[item.name][w]=[];
+        if(!data[item.name][w].includes(r.retailer)) data[item.name][w].push(r.retailer);
+      });
+    });
+  });
+
+  const products=Object.keys(data).sort();
+  const grid=document.getElementById('wk-calendar-grid');
+  let html=`<table class="wk-grid"><thead><tr><th class="row-header">Product</th>`;
+  visWeeks.forEach(w=>{
+    const d=parseDate(w);
+    html+=`<th${w===today?' class="wk-today"':''}>Wk of ${fmtWeekLabel(d)}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
+
+  let conflictCount=0;
+  products.forEach(p=>{
+    const shortName=p.length>36?p.substring(0,34)+'…':p;
+    html+=`<tr><td class="row-header" title="${p}">${shortName}</td>`;
+    visWeeks.forEach(w=>{
+      const custs=data[p]&&data[p][w]?data[p][w]:[];
+      if(!custs.length){html+=`<td><span class="wk-empty">—</span></td>`;return;}
+      const isConflict=custs.length>1;
+      if(isConflict) conflictCount++;
+      if(isConflict){
+        html+=`<td><div class="wk-conflict" onclick="showWeekDetail('${p.replace(/'/g,"\\'")}','${w}','conflict')" title="Conflict: ${custs.join(', ')}">
+          <i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-1px"></i> ${custs.length} customers
+        </div></td>`;
+      } else {
+        html+=`<td><div class="wk-cell" style="background:#EAF3DE;color:#3B6D11;border:1px solid #C0DD97">
+          ${custs[0].split(' ')[0]}
+        </div></td>`;
+      }
+    });
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table>`;
+  grid.innerHTML=html;
+
+  if(conflictCount===0){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:13px;color:var(--text2);padding:8px 0;text-align:center';
+    note.textContent='No conflicts detected in this date range.';
+    grid.appendChild(note);
+  }
+}
+
+function showWeekDetail(rowKey, week, view){
+  const reqs = JSON.parse(localStorage.getItem('adRequests')||'[]').filter(r=>r.status==='approved');
+  const d=parseDate(week);
+  const panel=document.getElementById('wk-detail-panel');
+  const title=document.getElementById('wk-detail-title');
+  const body=document.getElementById('wk-detail-body');
+  title.textContent=rowKey+' — week of '+fmtWeekLabel(d);
+  let rows=[];
+  reqs.forEach(r=>{
+    (r.items||[]).forEach(item=>{
+      if(!getAdWeeks(r,item).includes(week)) return;
+      if(view==='customer'&&r.retailer!==rowKey) return;
+      if(view==='product'&&item.name!==rowKey) return;
+      if(view==='conflict'&&item.name!==rowKey) return;
+      const pv=itemPromoVol(item);
+      const lc=+item.landedCost||0;
+      const pd=+item.promoDLVD||0;
+      const margin=lc>0?(pd-lc).toFixed(2):'—';
+      rows.push({customer:r.retailer,product:item.name||'—',normalVol:+item.normalVol||0,promoLift:+item.promoLift||0,vol:pv,dlvd:pd,landedCost:lc,margin,sales:(pv*pd).toFixed(2),reqId:r.id,adBreak:r.adBreak});
+    });
+  });
+  if(!rows.length){body.innerHTML='<div style="color:var(--text3);font-size:13px">No data.</div>';panel.style.display='block';return;}
+  const totalVol=rows.reduce((s,r)=>s+r.vol,0);
+  const totalSales=rows.reduce((s,r)=>s+parseFloat(r.sales),0);
+  body.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;font-size:12px">
+    <thead><tr><th>Customer</th><th>Product</th><th>Normal vol</th><th>Lift</th><th>Promo vol</th><th>Landed/cs</th><th>Promo DLVD</th><th>Margin/cs</th><th>Week sales</th><th>Ad break</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${r.customer}</td><td>${r.product}</td>
+      <td>${r.normalVol} cs</td><td style="color:var(--blue)">+${r.promoLift}</td>
+      <td style="font-weight:500">${r.vol} cs</td>
+      <td>${r.landedCost>0?'$'+r.landedCost.toFixed(2):'—'}</td>
+      <td>$${r.dlvd.toFixed(2)}</td>
+      <td style="color:${r.margin!=='—'&&parseFloat(r.margin)>=0?'var(--green)':'var(--red)'}">${r.margin!=='—'?'$'+r.margin:'—'}</td>
+      <td>$${r.sales}</td><td>${r.adBreak||'—'}</td>
+    </tr>`).join('')}</tbody>
+    <tfoot><tr style="font-weight:500;background:var(--bg2)"><td colspan="4">Total</td><td>${totalVol} cs</td><td colspan="3"></td><td>$${totalSales.toFixed(2)}</td><td></td></tr></tfoot>
+  </table></div>`;
+  panel.style.display='block';
+}
+
+function renderVolChart(reqs, visWeeks){
+  if(wkVolChart){wkVolChart.destroy();wkVolChart=null;}
+  const customers=[...new Set(reqs.map(r=>r.retailer))].sort();
+  const colorMap={};customers.forEach((c,i)=>colorMap[c]=CUST_COLORS[i%CUST_COLORS.length]);
+
+  const datasets=customers.map(c=>({
+    label:c,
+    data:visWeeks.map(w=>{
+      let vol=0;
+      reqs.filter(r=>r.retailer===c).forEach(r=>(r.items||[]).forEach(item=>{
+        if(getAdWeeks(r,item).includes(w)) vol+=itemPromoVol(item);
+      }));
+      return vol;
+    }),
+    backgroundColor:colorMap[c]+'99',
+    borderColor:colorMap[c],
+    borderWidth:1
+  }));
+
+  document.getElementById('wk-vol-legend').innerHTML=customers.map(c=>
+    `<span style="display:flex;align-items:center;gap:4px"><span class="legend-swatch" style="background:${colorMap[c]}"></span>${c}</span>`).join('');
+
+  const labels=visWeeks.map(w=>'Wk '+fmtWeekLabel(parseDate(w)));
+  wkVolChart=new Chart(document.getElementById('wkVolChart'),{
+    type:'bar',
+    data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw} cs`}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#9b9b97',font:{size:11},autoSkip:false,maxRotation:35}},
+        y:{stacked:true,ticks:{color:'#9b9b97',font:{size:11}},title:{display:true,text:'Promo cases',color:'#9b9b97',font:{size:11}}}
+      }
+    }
+  });
+}
+
+
+/* §JS-SEED — Demo data seed + app initialization
+   ───────────────────────────────────────────────
+   seedDemoData() only runs if localStorage is empty (safe for production).
+   All 7 records use v2 data shape: normalVol, promoLift, promoVol, landedCost.
+   promoVol is baked as normalVol+promoLift so legacy fallback in itemPromoVol()
+   is not needed for these records.
+
+   Intentional conflict for testing:
+     REQ-004 (Dierbergs Market) + REQ-006 (Schnucks):
+     Both have "COMM CV Broccoli Crown Approx18lb" active Jul 13–26
+     → shows red conflict cell in Weekly Calendar → Conflict view
+
+   TODO: Change auto-generated request IDs from REQ-{timestamp} to sequential
+   REQ-0001 format for easier verbal reference in team communication.
+   (Requires a server-side counter or a localStorage counter with collision risk) */
+function seedDemoData(){
+  if(allRequests.length) return;
+  const demo=[
+    {id:'REQ-001',submittedAt:'2026-05-01T10:00:00Z',submittedBy:'Dalton Cooper',retailer:'Dierbergs Market',status:'approved',adBreak:'2026-06-30',adStart:'2026-06-22',adStop:'2026-07-05',supplyReviewer:'Jimmy',freightReviewer:'Maria S.',perfReviewer:'Peter Pero V',
+      items:[{id:1,name:'FW CV Okra 12/12oz Tray',normalVol:20,promoLift:10,promoVol:30,landedCost:18.50,normalFOB:23.54,normalDLVD:27.33,promoFOB:22.54,promoDLVD:26.33}],supplyDecisions:{1:'Yes'}},
+    {id:'REQ-002',submittedAt:'2026-05-08T09:00:00Z',submittedBy:'Dalton Cooper',retailer:'Schnucks',status:'approved',adBreak:'2026-07-07',adStart:'2026-06-29',adStop:'2026-07-12',supplyReviewer:'Jimmy',freightReviewer:'Maria S.',perfReviewer:'Peter Pero V',
+      items:[
+        {id:1,name:'FC CV Green Beans Snipped 6/12oz Bag',normalVol:30,promoLift:15,promoVol:45,landedCost:14.20,normalFOB:18.20,normalDLVD:21.50,promoFOB:17.00,promoDLVD:20.00},
+        {id:2,name:'FC CV Broccoli Florets 6/12oz Bag',normalVol:25,promoLift:13,promoVol:38,landedCost:12.80,normalFOB:16.00,normalDLVD:19.00,promoFOB:15.00,promoDLVD:18.00}
+      ],supplyDecisions:{1:'Yes',2:'Yes'}},
+    {id:'REQ-003',submittedAt:'2026-05-12T14:00:00Z',submittedBy:'Sara Mitchell',retailer:'Walmart',status:'approved',adBreak:'2026-07-14',adStart:'2026-07-06',adStop:'2026-07-19',
+      items:[{id:1,name:'FW CV Mini Sweet Pep 12/8oz Bag',normalVol:50,promoLift:25,promoVol:75,landedCost:11.40,normalFOB:14.00,normalDLVD:17.00,promoFOB:13.00,promoDLVD:16.00}],
+      supplyDecisions:{1:'Yes'},supplyReviewer:'Jimmy',freightReviewer:'Tom B.',perfReviewer:'Peter Pero V'},
+    {id:'REQ-004',submittedAt:'2026-05-18T11:00:00Z',submittedBy:'Dalton Cooper',retailer:'Dierbergs Market',status:'approved',adBreak:'2026-07-21',adStart:'2026-07-13',adStop:'2026-07-26',
+      items:[
+        {id:1,name:'COMM CV Broccoli Crown Approx18lb',normalVol:18,promoLift:10,promoVol:28,landedCost:22.00,normalFOB:28.00,normalDLVD:32.00,promoFOB:26.00,promoDLVD:30.00},
+        {id:2,name:'FC CV Green Beans Snipped 6/12oz Bag',normalVol:22,promoLift:11,promoVol:33,landedCost:14.20,normalFOB:17.50,normalDLVD:20.50,promoFOB:16.50,promoDLVD:19.50}
+      ],supplyDecisions:{1:'Yes',2:'Yes'},supplyReviewer:'Jimmy',freightReviewer:'Maria S.',perfReviewer:'Peter Pero V'},
+    {id:'REQ-005',submittedAt:'2026-05-22T08:00:00Z',submittedBy:'Sara Mitchell',retailer:'Shop n Save',status:'approved',adBreak:'2026-07-28',adStart:'2026-07-20',adStop:'2026-08-02',
+      items:[
+        {id:1,name:'FW CV Zucchini 12/1ct Indi Wrapped',normalVol:15,promoLift:7,promoVol:22,landedCost:15.50,normalFOB:19.00,normalDLVD:22.00,promoFOB:18.00,promoDLVD:21.00},
+        {id:2,name:'FC CV Green Beans Snipped 6/12oz Bag',normalVol:20,promoLift:10,promoVol:30,landedCost:14.20,normalFOB:17.50,normalDLVD:20.50,promoFOB:16.50,promoDLVD:19.50}
+      ],supplyDecisions:{1:'Yes',2:'Yes'},supplyReviewer:'Lisa R.',freightReviewer:'Tom B.',perfReviewer:'Peter Pero V'},
+    {id:'REQ-006',submittedAt:'2026-05-24T10:00:00Z',submittedBy:'Dalton Cooper',retailer:'Schnucks',status:'approved',adBreak:'2026-07-21',adStart:'2026-07-13',adStop:'2026-07-26',
+      items:[{id:1,name:'COMM CV Broccoli Crown Approx18lb',normalVol:20,promoLift:10,promoVol:30,landedCost:22.00,normalFOB:28.00,normalDLVD:32.00,promoFOB:26.50,promoDLVD:30.50}],
+      supplyDecisions:{1:'Yes'},supplyReviewer:'Jimmy',freightReviewer:'Maria S.',perfReviewer:'Peter Pero V'},
+    {id:'REQ-007',submittedAt:'2026-05-25T09:00:00Z',submittedBy:'Dalton Cooper',retailer:'Walmart',status:'approved',adBreak:'2026-08-04',adStart:'2026-07-27',adStop:'2026-08-09',
+      items:[
+        {id:1,name:'FW CV Okra 12/12oz Tray',normalVol:40,promoLift:20,promoVol:60,landedCost:18.50,normalFOB:23.54,normalDLVD:27.33,promoFOB:22.00,promoDLVD:25.50},
+        {id:2,name:'FW CV Mini Sweet Pep 12/8oz Bag',normalVol:35,promoLift:15,promoVol:50,landedCost:11.40,normalFOB:14.00,normalDLVD:17.00,promoFOB:13.00,promoDLVD:16.00}
+      ],supplyDecisions:{1:'Yes',2:'Yes'},supplyReviewer:'Jimmy',freightReviewer:'Tom B.',perfReviewer:'Peter Pero V'},
+  ];
+  allRequests=demo;
+  localStorage.setItem('adRequests',JSON.stringify(allRequests));
+}
+
+// Init
+seedDemoData();
+allRequests=JSON.parse(localStorage.getItem('adRequests')||'[]');
+addItem(true);
+setDateDefaults();
+</script>
+</body>
+</html>

@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pero Family Farms — Planting Schedule</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Barlow+Condensed:wght@300;500;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Montserrat', 'Inter', sans-serif; background: url('https://www.perofamilyfarms.com/wp-content/themes/pero-family-farms/images/pero-farm-footer-bg.jpg') center top / cover no-repeat fixed; color: #1a2332; min-height: 100vh; }
+.app { display: flex; min-height: 100vh; }
+
+.module-bar { width:68px;position:fixed;top:0;bottom:0;left:0;background:rgba(22, 48, 90, 0.90);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:12;display:flex;flex-direction:column;gap:0; }
+.module-btn { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px 6px;cursor:pointer;color:rgba(255,255,255,0.45);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;border-left:3px solid transparent;transition:all 0.18s;text-align:center; }
+.module-btn:hover { color:#fff;background:rgba(255,255,255,0.07); }
+.module-btn.active { color:#f5c518;border-left-color:#f5c518;background:rgba(91,179,240,0.12); }
+.module-btn .mod-icon { font-size:22px;margin-bottom:2px; }
+.sidebar { width: 250px; background: rgba(29, 59, 105, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 68px; z-index: 10; box-shadow: 4px 0 20px rgba(30,58,95,0.15); transition:transform 0.2s; }
+.sidebar-logo { padding: 28px 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.sidebar-logo h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: #ffffff; letter-spacing: 0.02em; }
+.sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+.sidebar-nav { flex: 1; padding: 14px 0; overflow-y: auto; }
+.nav-section { padding: 16px 22px 6px; font-size: 10px; color: rgba(255,255,255,0.28); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 22px; cursor: pointer; font-size: 13.5px; color: rgba(255,255,255,0.55); transition: all 0.18s; border-left: 3px solid transparent; }
+.nav-item:hover { color: #ffffff; background: rgba(255,255,255,0.07); }
+.nav-item.active { color: #f5c518; border-left-color: #f5c518; background: rgba(91,179,240,0.13); font-weight: 500; }
+.nav-icon { width: 18px; text-align: center; font-size: 14px; }
+.sidebar-footer { padding: 16px 22px; border-top: 1px solid rgba(255,255,255,0.07); }
+.sidebar-footer p { font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; }
+
+.main { margin-left: 318px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid #e5eaf2; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 6px rgba(0,0,0,0.05); }
+.topbar-title { font-size: 16px; font-weight: 600; color: #1a2332; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.content { padding: 32px; flex: 1; }
+
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 8px; border: 1.5px solid; font-size: 13px; cursor: pointer; transition: all 0.18s; font-family: 'Inter', sans-serif; font-weight: 500; }
+.btn-primary { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+.btn-primary:hover { background: #2a4f80; border-color: #2a4f80; box-shadow: 0 4px 12px rgba(30,58,95,0.25); }
+.btn-ghost { background: transparent; border-color: #d0d9e8; color: #4a6080; }
+.btn-ghost:hover { border-color: #1e3a5f; color: #1e3a5f; background: #f0f4fa; }
+.btn-danger { background: transparent; border-color: #f0d0d0; color: #b03030; }
+.btn-danger:hover { background: #fff5f5; border-color: #e09090; }
+.btn-sm { padding: 6px 13px; font-size: 12px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 30px; }
+.stat-card { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid #e5eaf2; border-radius: 14px; padding: 22px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); overflow: hidden; position: relative; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #1e3a5f 0%, #5bb3f0 100%); }
+.stat-label { font-size: 11px; color: #8a9ab8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; font-weight: 600; }
+.stat-value { font-size: 34px; font-weight: 700; color: #1a2332; line-height: 1; letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; color: #a0aac0; margin-top: 5px; }
+
+.card { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid #e5eaf2; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.card-header { padding: 18px 22px; border-bottom: 1px solid #f0f4f9; display: flex; align-items: center; justify-content: space-between; background: #fafbfe; }
+.card-title { font-size: 11.5px; font-weight: 700; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.table { width: 100%; border-collapse: collapse; }
+.table th { padding: 11px 18px; text-align: left; font-size: 11px; color: #8a9ab8; text-transform: uppercase; letter-spacing: 0.09em; border-bottom: 1px solid #f0f4f9; font-weight: 600; background: #fafbfe; }
+.table td { padding: 13px 18px; font-size: 13.5px; border-bottom: 1px solid #f4f7fb; color: #2a3d52; }
+.table tr:last-child td { border-bottom: none; }
+.table tr.clickable { cursor: pointer; }
+.table tr.clickable:hover td { background: #f4f8ff; }
+
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
+.badge-green { background: #eaf7ef; color: #1a7a40; border: 1px solid #b8e8c8; }
+.badge-amber { background: #fef9e6; color: #8a6000; border: 1px solid #f5d878; }
+.badge-red { background: #fef0f0; color: #b03030; border: 1px solid #f5b8b8; }
+.badge-gray { background: #f2f4f7; color: #6a7890; border: 1px solid #d8dde8; }
+.badge-blue { background: #e8f2fd; color: #1a5090; border: 1px solid #b0d0f0; }
+
+.search-input { background: #f4f7fb; border: 1.5px solid #dde4ee; border-radius: 8px; padding: 9px 14px; font-size: 13px; color: #1a2332; width: 240px; font-family: 'Inter', sans-serif; }
+.search-input:focus { outline: none; border-color: #1e3a5f; background: #fff; box-shadow: 0 0 0 3px rgba(30,58,95,0.07); }
+.search-input::placeholder { color: #a0aac0; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(10,20,40,0.45); display: flex; align-items: flex-start; justify-content: center; z-index: 100; padding: 40px 20px; overflow-y: auto; backdrop-filter: blur(3px); }
+.modal { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; width: 100%; max-width: 660px; box-shadow: 0 24px 64px rgba(0,0,0,0.18); }
+.modal-header { padding: 22px 28px; border-bottom: 1px solid #f0f4f9; display: flex; align-items: center; justify-content: space-between; background: #fafbfe; border-radius: 16px 16px 0 0; }
+.modal-header h2 { font-size: 17px; color: #1a2332; font-weight: 600; }
+.close-btn { background: #f0f3f8; border: none; color: #6a7890; cursor: pointer; font-size: 15px; padding: 6px 10px; border-radius: 7px; line-height: 1; transition: all 0.15s; }
+.close-btn:hover { background: #e0e5ee; color: #1a2332; }
+.modal-body { padding: 26px 28px; max-height: 70vh; overflow-y: auto; }
+.modal-footer { padding: 18px 28px; border-top: 1px solid #f0f4f9; display: flex; justify-content: flex-end; gap: 10px; background: #fafbfe; border-radius: 0 0 16px 16px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.form-grid.one-col { grid-template-columns: 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 7px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-label { font-size: 12px; color: #4a6080; font-weight: 600; letter-spacing: 0.03em; }
+.form-input, .form-select, .form-textarea { background: #f8fafc; border: 1.5px solid #dde4ee; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; color: #1a2332; font-family: 'Inter', sans-serif; width: 100%; transition: all 0.18s; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #1e3a5f; background: #fff; box-shadow: 0 0 0 3px rgba(30,58,95,0.07); }
+.form-input::placeholder { color: #b0bcd0; }
+.form-textarea { min-height: 90px; resize: vertical; }
+.form-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #f0f4f9; }
+.form-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.form-section-title { font-size: 11px; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.form-section-title::after { content: ''; flex: 1; height: 1px; background: #e5eaf2; }
+select option { background: #fff; }
+
+.score-field { margin-bottom: 18px; }
+.score-field label { display: block; font-size: 12px; color: #4a6080; font-weight: 600; margin-bottom: 10px; }
+.score-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.score-btn { width: 38px; height: 38px; border-radius: 8px; border: 1.5px solid #dde4ee; background: #f8fafc; color: #8a9ab8; cursor: pointer; font-size: 13px; font-family: 'Inter', sans-serif; font-weight: 500; transition: all 0.15s; }
+.score-btn:hover { border-color: #1e3a5f; color: #1e3a5f; background: #f0f4fa; }
+.score-btn.active { background: #1e3a5f; border-color: #1e3a5f; color: #fff; font-weight: 700; box-shadow: 0 3px 10px rgba(30,58,95,0.28); }
+
+.info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
+.info-item { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid #e5eaf2; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+.info-item-label { font-size: 10.5px; color: #8a9ab8; text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 5px; font-weight: 600; }
+.info-item-value { font-size: 13.5px; color: #1a2332; font-weight: 500; }
+
+.planting-card { background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid #e5eaf2; border-radius: 12px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+.planting-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.09); }
+.planting-card-header { padding: 16px 20px; background: #fafbfe; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; transition: background 0.15s; }
+.planting-card-header:hover { background: #f0f5fb; }
+.planting-card-header.open { border-bottom: 1px solid #e5eaf2; }
+.planting-card-body { padding: 20px; }
+
+.grower-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1e3a5f, #3a6fa0); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.section-label { font-size: 11px; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 14px; }
+.action-row { display: flex; gap: 6px; justify-content: flex-end; }
+
+.empty-state { text-align: center; padding: 54px 20px; color: #b0bcd0; }
+.empty-state .empty-icon { font-size: 38px; margin-bottom: 14px; }
+.empty-state p { font-size: 14px; margin-top: 6px; }
+
+.toast { position: fixed; bottom: 28px; right: 28px; background: #1a2332; border-radius: 10px; padding: 13px 20px; font-size: 13.5px; color: #fff; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.2); animation: toastIn 0.3s cubic-bezier(.22,.68,0,1.2); display: flex; align-items: center; gap: 10px; }
+.toast-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.toast.success .toast-icon { background: #1a7a40; }
+.toast.info .toast-icon { background: #1e3a5f; }
+.toast.error .toast-icon { background: #b03030; }
+@keyframes toastIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.harvest-hint { margin-top: 12px; padding: 10px 14px; background: #e8f2fd; border-radius: 8px; font-size: 12.5px; color: #1a5090; border: 1px solid #b0d0f0; display: flex; align-items: center; gap: 8px; }
+.two-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.chip { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 500; background: #e8f2fd; color: #1a5090; margin-right: 4px; }
+.page-header { margin-bottom: 28px; }
+.login-screen { position:fixed;inset:0;background:transparent;display:flex;align-items:center;justify-content:center;z-index:999; }
+.login-card { background:rgba(255, 255, 255, 0.90);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid #e5eaf2;border-radius:18px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(30,58,95,0.12); }
+.login-logo { text-align:center;margin-bottom:28px; }
+.login-logo h1 { font-family:'Playfair Display',serif;font-size:28px;color:#1e3a5f; }
+.login-logo p { font-size:13px;color:#8a9ab8;margin-top:4px; }
+.login-error { background:#fff0f0;border:1px solid #f5b8b8;border-radius:8px;padding:10px 14px;font-size:13px;color:#b03030;margin-bottom:14px; }
+.file-upload-area { border: 2px dashed #dde4ee; border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.18s; background: #fafbfe; }
+.file-upload-area:hover { border-color: #1e3a5f; background: #f0f5fb; }
+.file-upload-area.dragover { border-color: #1e3a5f; background: #e8f2fd; }
+.file-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #f4f7fb; border: 1px solid #e5eaf2; border-radius: 8px; margin-top: 8px; }
+.file-item-icon { font-size: 18px; flex-shrink: 0; }
+.file-item-name { font-size: 13px; color: #2a3d52; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-item-size { font-size: 11px; color: #8a9ab8; flex-shrink: 0; }
+.file-item-del { background: none; border: none; color: #b03030; cursor: pointer; font-size: 15px; padding: 0 4px; flex-shrink: 0; }
+.file-item-del:hover { color: #d05050; }
+.file-item-view { background: none; border: 1px solid #d0d9e8; border-radius: 5px; color: #1e3a5f; cursor: pointer; font-size: 11px; padding: 3px 8px; font-family: inherit; flex-shrink: 0; }
+.file-item-view:hover { background: #e8f2fd; }
+.page-header h2 { font-family: 'Playfair Display', serif; font-size: 26px; color: #1a2332; }
+.page-header p { font-size: 13.5px; color: #6a7890; margin-top: 5px; }
+
+/* ── Standalone overrides ── */
+body { margin:0; }
+#app-shell { display:flex; height:100vh; flex-direction:column; }
+.ps-topbar { background:rgba(29, 59, 105, 0.88); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:3px solid var(--teal2,#4DBFCF); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:52px; flex-shrink:0; }
+.ps-brand  { display:flex; align-items:center; gap:12px; }
+.ps-bmark  { width:32px;height:32px;background:#1A5A30;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px; }
+.ps-bname  { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700; color:#fff; letter-spacing:0.04em; }
+.ps-bsub   { font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:300; color:#4DBFCF; letter-spacing:0.1em; text-transform:uppercase; }
+.ps-actions { display:flex; gap:8px; }
+.ps-btn { padding:6px 14px; border-radius:6px; border:1.5px solid rgba(255,255,255,0.2); background:transparent; color:#fff; font-family:'Barlow',sans-serif; font-size:12px; font-weight:500; cursor:pointer; transition:.15s; }
+.ps-btn:hover { background:rgba(255,255,255,0.08); }
+.ps-btn.primary { background:#1A5A30; border-color:#1A5A30; }
+.ps-btn.primary:hover { background:#236B38; }
+#content-area { flex:1; overflow-y:auto; background: transparent; }
+/* Toast */
+#toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast { padding:10px 18px; border-radius:8px; font-family:'Barlow',sans-serif; font-size:13px; font-weight:600; color:#fff; box-shadow:0 4px 16px rgba(0,0,0,0.15); animation:slideIn .2s ease; }
+.toast.success { background:#1A5A30; }
+.toast.error   { background:#8B2020; }
+.toast.info    { background:#2A7A90; }
+@keyframes slideIn { from{transform:translateX(20px);opacity:0} to{transform:none;opacity:1} }
+</style>
+</head>
+<body>
+<div id="app-shell">
+  <div class="ps-topbar">
+    <div class="ps-brand">
+      <div class="ps-bmark">🌾</div>
+      <div>
+        <div class="ps-bname">PERO FAMILY FARMS</div>
+        <div class="ps-bsub">Planting Schedule</div>
+      </div>
+    </div>
+    <div class="ps-actions">
+      <a href="../../index.html" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:1px solid rgba(255,255,255,0.20);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.03em;transition:all 0.15s" onmouseover="this.style.color='#f5c518';this.style.borderColor='rgba(245,197,24,0.50)'" onmouseout="this.style.color='rgba(255,255,255,0.75)';this.style.borderColor='rgba(255,255,255,0.20)'">&#8592; Pero Central</a>
+      <button class="ps-btn" onclick="psResetSchedule()" title="Reset all acres to zero">↺ Reset Acres</button>
+      <button class="ps-btn" onclick="psClearAllAcres()" title="Clear all acres">✕ Clear</button>
+      <button class="ps-btn primary" onclick="psSave();showToast('Schedule saved','success')">💾 Save</button>
+    </div>
+  </div>
+  <div id="content-area"></div>
+</div>
+<div id="toast-container"></div>
+<div id="modal-container"></div>
+
+<script>
+// ── STANDALONE BOOTSTRAP ────────────────────────────────────────────────────
+var currentView = 'planting-schedule';
+var selectedGrowerId = null;
+
+// Growers — loaded from localStorage (shared with FieldTrack if on same origin)
+var growers = [];
+function loadStandaloneData(){
+  try{ var g=localStorage.getItem('ft_growers'); if(g) growers=JSON.parse(g); }catch(e){ growers=[]; }
+  // also load demandEntries for the DEMAND row in PS
+  try{ var d=localStorage.getItem('ft_demandEntries'); if(d) demandEntries=JSON.parse(d); }catch(e){}
+}
+var demandEntries = [];
+
+function renderContent(){
+  var el = document.getElementById('content-area');
+  try{ el.innerHTML = renderPlantingSchedule(); }
+  catch(err){ el.innerHTML='<div style="padding:24px;color:#8B2020"><strong>Error: </strong>'+err.message+'<pre style="font-size:11px;margin-top:8px">'+err.stack+'</pre></div>'; console.error(err); }
+}
+
+function navigate(view, gid){
+  // In standalone mode, clicking "Back to growers" does nothing useful
+  // Just re-render the planting schedule
+  currentView = 'planting-schedule';
+  renderContent();
+}
+
+// ── UTILITY FUNCTIONS ────────────────────────────────────────────────────────
+function uid(){return '_'+Math.random().toString(36).slice(2,10)+Date.now();}
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function getMondayOf(dateStr){
+  // Returns the Monday of the week containing dateStr
+  const d = new Date(dateStr);
+  const day = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+  const diff = (day===0) ? -6 : 1 - day; // shift to Monday
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0,10);
+}
+
+function showToast(msg,type='success'){
+  const icons={success:'✓',info:'i',error:'!'};
+  document.getElementById('toast-container').innerHTML=
+    `<div class="toast ${type}"><div class="toast-icon">${icons[type]||'✓'}</div>${esc(msg)}</div>`;
+  setTimeout(()=>{document.getElementById('toast-container').innerHTML='';},3200);
+}
+
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODAL SYSTEM
+// ═══════════════════════════════════════════════════════════════════════
+
+
+// ── PLANTING SCHEDULE MODULE ─────────────────────────────────────────────────
+PS_HARVEST_DATES = ["2025-09-28","2025-10-05","2025-10-12","2025-10-19","2025-10-26","2025-11-02","2025-11-09","2025-11-16","2025-11-23","2025-11-30","2025-12-07","2025-12-14","2025-12-21","2025-12-28","2026-01-04","2026-01-11","2026-01-18","2026-01-25","2026-02-01","2026-02-08","2026-02-15","2026-02-22","2026-03-01","2026-03-08","2026-03-15","2026-03-22","2026-03-29","2026-04-05","2026-04-12","2026-04-19","2026-04-26"];
+
+const PS_DEFAULT_CONV = [{"name": "Delray", "code": "1001", "avail": 350, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "York", "code": "1007", "avail": 160, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Obern", "code": "1010", "avail": 400, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 155.6, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "West McDaniel", "code": "1034", "avail": 220, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "behind reservoir McDan 13-18", "code": "1034", "avail": 217, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60, 130, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "behind reservoir McDan 19-23", "code": "1034", "avail": 512, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "front of reservoir sec 1-12 front", "code": "1034", "avail": 230, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 38.8, 0, 0, 100, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Greenridge South", "code": "1016", "avail": 200, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Duck Curve/Gladstone", "code": "1046", "avail": 550, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 260, 260, 260], "section": "pero"}, {"name": "J7 Farm 2", "code": "1059", "avail": 400, "acres": [0, 0, 0, 0, 0, 0, 22.7, 51.3, 27.2, 86.6, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "J7 Farm 3", "code": "1064", "avail": 295, "acres": [0, 0, 0, 0, 0, 0, 33.5, 50, 84, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "J7 Farm 5", "code": "1064", "avail": 400, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Sugar Bell North", "code": "1082", "avail": 315, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}];
+
+const PS_DEFAULT_ORG = [{"name": "Obern", "code": "4010", "avail": 70, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Garcia - Potato Farm", "code": "4040", "avail": 315, "acres": [0, 0, 0, 0, 0, 0, 107, 140.4, 91.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Garcia Farm 11", "code": "", "avail": 360, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Garcia Farm 12 N", "code": "", "avail": 550, "acres": [0, 0, 0, 0, 0, 0, 105.8, 94.4, 34.8, 90.4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Garcia Farm 12 S", "code": "", "avail": 300, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Reservation 1-6", "code": "4033", "avail": 200, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 170, 160, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 160, 160], "section": "pero"}, {"name": "Reservation 12-13", "code": "4033", "avail": 90, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Watermelon Shed 8-9", "code": "4033", "avail": 70, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 55, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Sugar Bell South", "code": "4082", "avail": 600, "acres": [0, 0, 0, 0, 0, 0, 48.4, 102.4, 27.6, 82.9, 111.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "J7 Farm 4", "code": "4064", "avail": 0, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Old Lady", "code": "4032", "avail": 218, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 112.3, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Okeechobee", "code": "4016", "avail": 350, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}, {"name": "Lykes", "code": "", "avail": 3373, "acres": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "section": "pero"}];
+
+let psConvFarms=null,psOrgFarms=null,psActiveTab='conventional';
+let psActiveSeason='2025-2026'; // active season key
+// Per-tab mutable dates & per-week yields
+let psDates=null;           // shared harvest dates array (YYYY-MM-DD)
+let psDaysToHarvest=null;   // per-week days to harvest (number, default 55)
+let psConvYields=null;      // per-week yield for conventional (cartons/ac)
+let psOrgYields=null;       // per-week yield for organic (cartons/ac)
+
+// ── SEASON HELPERS ────────────────────────────────────────────────────
+function psFirstMondayOfSeptember(year){
+  // Find first Monday of September in given year
+  var d = new Date(year+'-09-01T12:00:00');
+  while(d.getDay()!==1) d.setDate(d.getDate()+1);
+  return d.toISOString().slice(0,10);
+}
+function psGenerateSeasonDates(startMonday, nWeeks){
+  // Returns array of Sunday harvest dates (Monday + 6 days) for nWeeks weeks
+  var dates=[];
+  var d=new Date(startMonday+'T12:00:00');
+  for(var i=0;i<nWeeks;i++){
+    var sun=new Date(d); sun.setDate(sun.getDate()+6);
+    dates.push(sun.toISOString().slice(0,10));
+    d.setDate(d.getDate()+7);
+  }
+  return dates;
+}
+const PS_BUILT_IN_SEASONS={
+  '2025-2026': psGenerateSeasonDates(psFirstMondayOfSeptember(2025), 31),
+  '2026-2027': psGenerateSeasonDates(psFirstMondayOfSeptember(2026), 31)
+};
+function psGetSeasons(){
+  try{ var s=localStorage.getItem('ft_psSeasons'); return s?JSON.parse(s):Object.assign({},PS_BUILT_IN_SEASONS); }
+  catch(e){ return Object.assign({},PS_BUILT_IN_SEASONS); }
+}
+function psSaveSeasons(seasons){
+  localStorage.setItem('ft_psSeasons',JSON.stringify(seasons));
+}
+function psLoadSeason(seasonKey){
+  var seasons=psGetSeasons();
+  var dates=seasons[seasonKey];
+  if(!dates||!dates.length) return;
+  // Load dates and reset per-week arrays
+  psDates=dates.slice();
+  psDaysToHarvest=new Array(dates.length).fill(55);
+  psConvYields=new Array(dates.length).fill(150);
+  psOrgYields=new Array(dates.length).fill(180);
+  // Reset farm acres arrays to match new length
+  function resizeAcres(farms){
+    farms.forEach(function(f){
+      while(f.acres.length<dates.length) f.acres.push(0);
+      f.acres=f.acres.slice(0,dates.length);
+    });
+  }
+  if(psConvFarms) resizeAcres(psConvFarms);
+  if(psOrgFarms)  resizeAcres(psOrgFarms);
+  psSave();
+}
+function psCreateSeason(){
+  var name=prompt('Enter season name (e.g. 2027-2028):');
+  if(!name||!name.trim()) return;
+  name=name.trim();
+  var startYearMatch=name.match(/^(\d{4})/);
+  var startYear=startYearMatch?parseInt(startYearMatch[1]):new Date().getFullYear();
+  var startMon=psFirstMondayOfSeptember(startYear);
+  var custom=prompt('Start date (first Monday of Sept '+startYear+' is '+startMon+') — press OK to use it or type a different YYYY-MM-DD date:',startMon);
+  if(!custom) return;
+  var dates=psGenerateSeasonDates(custom.trim(),31);
+  var seasons=psGetSeasons();
+  seasons[name]=dates;
+  psSaveSeasons(seasons);
+  psActiveSeason=name;
+  // Clear all inputs — fresh season starts blank
+  psConvFarms = JSON.parse(JSON.stringify(PS_DEFAULT_CONV)).map(function(f){
+    return Object.assign({},f,{acres:new Array(dates.length).fill(0),crop2:0});
+  });
+  psOrgFarms  = JSON.parse(JSON.stringify(PS_DEFAULT_ORG)).map(function(f){
+    return Object.assign({},f,{acres:new Array(dates.length).fill(0),crop2:0});
+  });
+  psDates           = dates.slice();
+  psDaysToHarvest   = new Array(dates.length).fill(55);
+  psConvYields      = new Array(dates.length).fill(150);
+  psOrgYields       = new Array(dates.length).fill(180);
+  psSave();
+  showToast('Season '+name+' created — all fields cleared for new season!');
+  renderContent();
+}
+function psSwitchSeason(seasonKey){
+  psActiveSeason=seasonKey;
+  psConvFarms=null; psOrgFarms=null;
+  psDates=null; psDaysToHarvest=null; psConvYields=null; psOrgYields=null;
+  psLoad();
+  renderContent();
+}
+
+function psSeasonKey(k){ return 'ft_ps_'+k.replace(/[^a-z0-9]/gi,'_'); }
+function psLoad(){
+  var sk = psSeasonKey(psActiveSeason);
+  if(!psConvFarms){
+    var s=localStorage.getItem(sk+'_conv');
+    psConvFarms=s?JSON.parse(s):JSON.parse(JSON.stringify(PS_DEFAULT_CONV));
+    // migrate legacy single-season data
+    if(!s){var leg=localStorage.getItem('ft_psConv');if(leg)psConvFarms=JSON.parse(leg);}
+  }
+  if(!psOrgFarms){
+    var s2=localStorage.getItem(sk+'_org');
+    psOrgFarms=s2?JSON.parse(s2):JSON.parse(JSON.stringify(PS_DEFAULT_ORG));
+    if(!s2){var leg2=localStorage.getItem('ft_psOrg');if(leg2)psOrgFarms=JSON.parse(leg2);}
+  }
+  if(!psDates){
+    var sd=localStorage.getItem(sk+'_dates');
+    if(sd){psDates=JSON.parse(sd);}
+    else{var seasons=psGetSeasons();psDates=(seasons[psActiveSeason]||PS_HARVEST_DATES).slice();}
+  }
+  if(!psDaysToHarvest){var sdth=localStorage.getItem(sk+'_dth');psDaysToHarvest=sdth?JSON.parse(sdth):new Array(psDates.length).fill(55);}
+  if(!psConvYields){var sc=localStorage.getItem(sk+'_cy');psConvYields=sc?JSON.parse(sc):new Array(psDates.length).fill(150);}
+  if(!psOrgYields){var so=localStorage.getItem(sk+'_oy');psOrgYields=so?JSON.parse(so):new Array(psDates.length).fill(180);}
+  while(psDaysToHarvest.length<psDates.length)psDaysToHarvest.push(55);
+  while(psConvYields.length<psDates.length)psConvYields.push(150);
+  while(psOrgYields.length<psDates.length)psOrgYields.push(180);
+}
+function psSave(){
+  var sk=psSeasonKey(psActiveSeason);
+  localStorage.setItem(sk+'_conv',JSON.stringify(psConvFarms));
+  localStorage.setItem(sk+'_org',JSON.stringify(psOrgFarms));
+  localStorage.setItem(sk+'_dates',JSON.stringify(psDates));
+  localStorage.setItem(sk+'_dth',JSON.stringify(psDaysToHarvest));
+  localStorage.setItem(sk+'_cy',JSON.stringify(psConvYields));
+  localStorage.setItem(sk+'_oy',JSON.stringify(psOrgYields));
+}
+function psFmt(d){if(!d)return '';var dt=new Date(d+'T12:00:00');return (dt.getMonth()+1)+'/'+(dt.getDate())+'/'+String(dt.getFullYear()).slice(2);}
+
+function renderPlantingSchedule(){
+  psLoad();
+  var farms=psActiveTab==='conventional'?psConvFarms:psOrgFarms;
+  var comm=psActiveTab==='conventional'?'Green Beans':'Organic Green Beans';
+  var col=psActiveTab==='conventional'?'#1e3a5f':'#1a4a28';
+  var lc=psActiveTab==='conventional'?'#e8f2fd':'#e8f8ee';
+  var wkYields=psActiveTab==='conventional'?psConvYields:psOrgYields;
+  var avgYield=(wkYields.reduce(function(s,v){return s+v;},0)/Math.max(wkYields.length,1)).toFixed(0);
+  var N=psDates.length;
+  var weekAcres=[],weekLbs=[],weekDemand=[];
+  for(var w=0;w<N;w++){
+    var ac=farms.reduce(function(s,f){return s+(parseFloat(f.acres[w])||0);},0);
+    weekAcres.push(ac);
+    weekLbs.push(0); // placeholder, recalculated below
+    var harvestDate=psDates[w];
+    // Convert harvest date to its Monday (demand entries use Monday as weekStart)
+    var mon=getMondayOf(harvestDate);
+    var dem=demandEntries.filter(function(d){return d.weekStart===mon&&d.commodity===comm;}).reduce(function(s,d){return s+(parseFloat(d.demandLbs)||0);},0);
+    weekDemand.push(dem);
+  }
+  // recalculate weekLbs using per-week yields
+  weekLbs=weekAcres.map(function(ac,wi){
+    var wy=wkYields[wi]||0;
+    return ac>0&&wy>0?Math.round(ac*wy*28):0;
+  });
+  var totalAc=weekAcres.reduce(function(s,a){return s+a;},0);
+  var totalLbs=weekLbs.reduce(function(s,l){return s+l;},0);
+  var totalBins=totalLbs?Math.ceil(totalLbs/500):0;
+  var totalDem=weekDemand.reduce(function(s,d){return s+d;},0);
+  var totalDiff=totalLbs-totalDem;
+  var dcol=totalDiff>=0?'#1a7a40':'#b03030';
+
+  var tabs=['conventional','organic'].map(function(t){
+    var label=t==='conventional'?'🌾 Conventional Green Beans':'🌿 Organic Green Beans';
+    var active=t===psActiveTab;
+    return '<button onclick="psActiveTab=\''+t+'\';renderContent()" style="padding:8px 20px;border-radius:8px;border:1.5px solid '+(active?col:'#dde4ee')+';background:'+(active?col:'#fff')+';color:'+(active?'#fff':'#4a6080')+';font-size:13px;cursor:pointer;font-weight:'+(active?700:400)+';font-family:inherit">'+label+'</button>';
+  }).join('');
+
+  // Season bar
+  var seasons=psGetSeasons();
+  var seasonOpts2=Object.keys(seasons).map(function(s){
+    return '<option value="'+s+'"'+(s===psActiveSeason?' selected':'')+'>'+s+'</option>';
+  }).join('');
+  var seasonBar='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 16px;background:#1e3a5f;border-radius:10px;flex-wrap:wrap">'
+    +'<span style="font-size:13px;font-weight:700;color:#fff">📅 Season:</span>'
+    +'<select style="padding:6px 12px;border:none;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer" onchange="psSwitchSeason(this.value)">'+seasonOpts2+'</select>'
+    +'<button onclick="psCreateSeason()" style="padding:6px 14px;border:none;border-radius:6px;background:#fff;color:#1e3a5f;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Create Season</button>'
+    +'<span style="font-size:11px;color:rgba(255,255,255,0.65);margin-left:4px">'+psDates.length+' weeks · starts first Monday of September</span>'
+    +'</div>';
+
+  var statCards='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px">'
+    +'<div class="stat-card"><div class="stat-label">Total Acres</div><div class="stat-value" style="color:'+col+'">'+totalAc.toLocaleString()+'</div><div class="stat-sub">all farms & weeks</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Total Est. Lbs</div><div class="stat-value" style="color:#1a7a40">'+(totalLbs>0?(totalLbs/1000000).toFixed(2)+'M':'—')+'</div><div class="stat-sub">acres × avg '+avgYield+' × 28</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Total Bins</div><div class="stat-value" style="color:#5a8a60">'+(totalBins>0?totalBins.toLocaleString():'—')+'</div><div class="stat-sub">lbs ÷ 500</div></div>'
+    +'<div class="stat-card"><div class="stat-label">Total Demand</div><div class="stat-value" style="color:#1a5090">'+(totalDem>0?(totalDem/1000000).toFixed(2)+'M':'—')+'</div><div class="stat-sub">from demand plan</div></div>'
+    +'<div class="stat-card"><div class="stat-label">'+(totalDiff>=0?'Surplus':'Shortfall')+'</div><div class="stat-value" style="color:'+dcol+'">'+(totalDiff>=0?'+':'')+Math.round(totalDiff/1000)+'K lbs</div><div class="stat-sub">supply vs demand</div></div>'
+    +'</div>';
+
+  var yieldBar='<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding:13px 18px;background:'+lc+';border-radius:10px;border:1px solid '+col+'30;flex-wrap:wrap">'
+    +'<div>'
+    +'<span style="font-size:13px;font-weight:700;color:'+col+'">Yield per week (cartons/ac):</span>'
+    +'<span style="font-size:11.5px;color:#6a7888;margin-left:8px">Avg: <strong>'+avgYield+' ct/ac</strong> — edit each week&#39;s yield in the column header</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;margin-left:auto;align-items:center">'
+    +'<button class="btn btn-ghost btn-sm" onclick="psSetAllYields()">Set All Yields</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="psAddWeek()">+ Add Week</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="psAddFarm()">+ Add Farm</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="psClearAllAcres()" style="color:#b03030">🗑 Clear All Acres</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="psResetSchedule()" style="color:#b03030">↺ Reset</button>'
+    +'</div>'
+    +'<div style="width:100%;font-size:11.5px;color:#6a7888">Formula: <strong>acres × yield(week) × 28 = lbs</strong> · Bins = lbs ÷ 500 · Edit dates and yields in each column header above</div>'
+    +'</div>';
+
+  var wkHdr=psDates.map(function(d,wi){
+    var yv=wkYields[wi]||0;
+    var dth=psDaysToHarvest[wi]||55;
+    // Calculate plant date = harvest date - daysToHarvest
+    var plantDate='';
+    try{
+      var hdt=new Date(d+'T12:00:00');
+      hdt.setDate(hdt.getDate()-dth);
+      plantDate=hdt.toISOString().slice(0,10);
+    }catch(e){}
+    var demBins=0;
+    var demLbs=demandEntries.filter(function(de){return de.weekStart===getMondayOf(d)&&de.commodity===comm;}).reduce(function(s,de){return s+(parseFloat(de.demandLbs)||0);},0);
+    if(demLbs) demBins=Math.ceil(demLbs/500);
+    return '<th style="min-width:82px;text-align:center;padding:3px 2px;background:'+lc+';border-bottom:none;vertical-align:top">'
+      // ── HARVEST DATE (editable) ──
+      +'<div style="font-size:8.5px;color:'+col+';font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1px">Harvest</div>'
+      +'<input type="date" value="'+d+'"'
+      +' style="width:92px;padding:2px 3px;border:1px solid '+col+'40;border-radius:4px;font-size:9px;text-align:center;background:rgba(255,255,255,0.8);color:#1a2332;font-family:inherit"'
+      +' onchange="psUpdateDate('+wi+',this.value)" title="Harvest date" />'
+      // ── DAYS TO HARVEST (editable) ──
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:2px;margin-top:3px">'
+      +'<span style="font-size:8px;color:#8a9ab8">DTH:</span>'
+      +'<input type="number" value="'+dth+'" min="1" step="1"'
+      +' style="width:38px;padding:2px 3px;border:1px solid #dde4ee;border-radius:4px;font-size:9.5px;text-align:center;color:#4a6080;font-family:inherit"'
+      +' oninput="psUpdateDTH('+wi+',this.value)" title="Days to harvest" />'
+      +'</div>'
+      // ── PLANT DATE (auto-calculated, read-only) ──
+      +'<div style="font-size:8px;color:#5a7090;margin-top:3px">🌱 '+psFmt(plantDate)+'</div>'
+      // ── YIELD (editable) ──
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:2px;margin-top:3px">'
+      +'<span style="font-size:8px;color:'+col+';opacity:0.8">Yld:</span>'
+      +'<input type="number" value="'+yv+'" min="1" step="1"'
+      +' style="width:38px;padding:2px 3px;border:1px solid '+col+'40;border-radius:4px;font-size:9.5px;text-align:center;font-weight:700;color:'+col+';font-family:inherit"'
+      +' oninput="psUpdateWeekYield('+wi+',this.value)" title="Yield cartons/ac" />'
+      +'</div>'
+      // ── DEMAND BINS (from demand plan) ──
+      +'<div style="margin-top:3px;padding:2px 3px;background:'+(demBins?'#e8f2fd':'transparent')+';border-radius:3px;font-size:8.5px;font-weight:'+(demBins?700:400)+';color:'+(demBins?'#1a5090':'#c0cad8')+'">'
+      +(demBins?'📊 '+demBins+' bins dem':'no demand')
+      +'</div>'
+      +'</th>';
+  }).join('');
+
+  // Helper: render a single farm row
+  function renderFarmRow(farm, fi, isEditable){
+    var farmTotal=farm.acres.reduce(function(s,a){return s+(parseFloat(a)||0);},0);
+    var tab=psActiveTab;
+    var wkCells=farm.acres.map(function(ac,wi){
+      var v=ac>0?ac:'';
+      var bg=v?lc:'#fff';
+      return '<td style="padding:2px 2px;text-align:center">'
+        +'<input type="number" step="0.1" value="'+v+'" placeholder="" min="0"'
+        +' style="width:60px;padding:3px 5px;border:1px solid #dde4ee;border-radius:5px;font-size:11.5px;text-align:center;background:'+bg+';font-family:inherit"'
+        +' oninput="psUpdateAcre(\''+tab+'\','+fi+','+wi+',this.value,this,\''+col+'\',\''+lc+'\')"'
+        +' onfocus="this.style.borderColor=\''+col+'\'" onblur="this.style.borderColor=\'#dde4ee\'"/>'
+        +'</td>';
+    }).join('');
+    var nameCell = isEditable
+      ? '<input value="'+esc(farm.name)+'" style="width:100%;padding:2px 4px;border:1px solid #dde4ee;border-radius:4px;font-size:11.5px;font-weight:600;font-family:inherit;color:#1a2332;background:rgba(255,255,255,0.7)" oninput="psUpdateFarmField(\''+tab+'\','+fi+',\'name\',this.value)" placeholder="Farm name"/>'
+      : '<span style="font-weight:600;font-size:12px">'+esc(farm.name)+'</span>';
+    var codeCell = isEditable
+      ? '<input value="'+esc(farm.code||'')+'" style="width:52px;padding:2px 3px;border:1px solid #dde4ee;border-radius:4px;font-size:10.5px;font-family:inherit;color:#4a6080" oninput="psUpdateFarmField(\''+tab+'\','+fi+',\'code\',this.value)" placeholder="Code"/>'
+      : '<span style="font-size:10.5px;color:#8a9ab8">'+esc(farm.code||'')+'</span>';
+    var availCell = isEditable
+      ? '<input type="number" value="'+(farm.avail||'')+'" style="width:52px;padding:2px 3px;border:1px solid #dde4ee;border-radius:4px;font-size:10.5px;text-align:right;font-family:inherit;color:'+col+'" oninput="psUpdateFarmField(\''+tab+'\','+fi+',\'avail\',parseFloat(this.value)||0)" placeholder="Ac"/>'
+      : '<span style="font-size:11.5px;font-weight:600;color:'+col+'">'+(farm.avail>0?farm.avail.toLocaleString():'—')+'</span>';
+    // 2nd Crop = avail x 2 (auto-calculated, read-only)
+    var avail = parseFloat(farm.avail)||0;
+    var crop2 = avail * 2;
+    var crop2Cell = '<span style="font-size:11.5px;font-weight:600;color:#1a4a28">'+(crop2>0?crop2.toLocaleString():'—')+'</span>';
+    // Balance = avail - total acres planted (all plantings for this farm)
+    var balance = avail - farmTotal;
+    var balColor = balance>=0?'#1a7a40':'#b03030';
+    // Balance 2nd Crop = (avail x 2) - total acres planted
+    var balance2 = crop2 - farmTotal;
+    var bal2Color = balance2>=0?'#1a4a28':'#b03030';
+    return '<tr style="border-bottom:1px solid #f0f4f9">'
+      +'<td style="padding:4px 8px;min-width:180px;position:sticky;left:0;background:#fff;z-index:1;border-right:1px solid #e5eaf2">'+nameCell+'</td>'
+      +'<td style="padding:4px 5px;white-space:nowrap">'+codeCell+'</td>'
+      +'<td style="padding:4px 5px;text-align:right;white-space:nowrap">'+availCell+'</td>'
+      +'<td style="padding:4px 5px;text-align:right;white-space:nowrap">'+crop2Cell+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;white-space:nowrap;font-weight:700;font-size:11.5px;color:'+balColor+'">'+( avail>0||farmTotal>0 ? (balance>=0?'':'')+balance.toFixed(1) : '—')+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;white-space:nowrap;font-weight:700;font-size:11.5px;color:'+bal2Color+'">'+( crop2>0||farmTotal>0 ? (balance2>=0?'':'')+balance2.toFixed(1) : '—')+'</td>'
+      +'<td style="padding:4px 8px;font-weight:700;color:'+col+';text-align:right;white-space:nowrap;border-left:2px solid '+col+'20;border-right:2px solid '+col+'20;background:#f8fafc">'+(farmTotal>0?farmTotal.toLocaleString():'—')+'</td>'
+      +wkCells
+      +'<td style="padding:3px;text-align:center;position:sticky;right:0;background:#f8fafc"><button onclick="psRemoveFarm(\''+tab+'\','+fi+')" style="color:#b03030;background:none;border:none;cursor:pointer;font-size:13px;padding:2px 5px">✕</button></td>'
+      +'</tr>';
+  }
+  // Helper: render a section header banner
+  function sectionBanner(label, bgColor, textColor){
+    var emptyCols=psDates.map(function(){return '<td style="background:'+bgColor+'"></td>';}).join('');
+    return '<tr style="background:'+bgColor+'">'
+      +'<td colspan="6" style="padding:6px 12px;font-weight:800;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:'+textColor+';position:sticky;left:0;background:'+bgColor+';border-right:1px solid #e5eaf2">'+label+'</td>'
+      +'<td style="background:'+bgColor+'"></td>'
+      +emptyCols
+      +'<td style="background:'+bgColor+';position:sticky;right:36px"></td>'
+      +'<td style="background:'+bgColor+';position:sticky;right:0"></td>'
+      +'</tr>';
+  }
+
+  // Helper: section total row
+  function sectionTotalRow(label, sectionFarms, bgColor, textColor){
+    var wkTotals=psDates.map(function(d,wi){
+      var ac=sectionFarms.reduce(function(s,f){return s+(parseFloat(f.acres[wi])||0);},0);
+      return '<td style="padding:5px 3px;text-align:center;font-weight:700;font-size:11px;color:'+textColor+';background:'+bgColor+'">'+(ac>0?ac.toLocaleString():'—')+'</td>';
+    }).join('');
+    var tot=sectionFarms.reduce(function(s,f){return s+f.acres.reduce(function(ss,a){return ss+(parseFloat(a)||0);},0);},0);
+    return '<tr style="background:'+bgColor+';border-top:2px solid '+textColor+'30">'
+      +'<td colspan="3" style="padding:6px 12px;font-weight:700;font-size:11.5px;color:'+textColor+';position:sticky;left:0;background:'+bgColor+';border-right:1px solid #e5eaf2">'+label+' TOTAL ACRES</td>'
+      +wkTotals
+      +'<td style="padding:6px 8px;font-weight:800;color:'+textColor+';text-align:right;position:sticky;right:36px;background:'+bgColor+';border-left:1px solid #e5eaf2">'+tot.toLocaleString()+'</td>'
+      +'<td style="background:'+bgColor+';position:sticky;right:0"></td>'
+      +'</tr>';
+  }
+
+  // Split farms into Pero and Contract sections
+  var peroFarms     = farms.map(function(f,i){return{f:f,i:i};}).filter(function(x){return x.f.section!=='contract';});
+  var contractFarms = farms.map(function(f,i){return{f:f,i:i};}).filter(function(x){return x.f.section==='contract';});
+
+  // Build Pero section
+  var peroRows = peroFarms.map(function(x){ return renderFarmRow(x.f, x.i, true); }).join('');
+
+  // 5 blank Pero rows (editable, no grower dropdown — free-form)
+  var peroBlank='';
+  var peroBlankBase=farms.length;
+  for(var bi=0;bi<5;bi++){
+    var bCells3=psDates.map(function(d,wi){
+      return '<td style="padding:2px;text-align:center"><input type="number" step="0.1" placeholder="" min="0" data-bi="'+bi+'" data-wi="'+wi+'" data-section="pero" style="width:60px;padding:3px 5px;border:1px solid #eee;border-radius:5px;font-size:11.5px;text-align:center;background:#fafbfe;font-family:inherit" oninput="psBlankAcreChange(this)"/></td>';
+    }).join('');
+    peroBlank+='<tr style="border-bottom:1px solid #f5f7fa" data-pero-blank="'+bi+'">'
+      +'<td style="padding:4px 8px;position:sticky;left:0;background:#fafbfe;z-index:1;border-right:1px solid #e5eaf2"><input placeholder="Farm name" data-bi="'+bi+'" data-field="name" style="width:100%;padding:2px 4px;border:1px solid #e5eaf2;border-radius:4px;font-size:11.5px;font-family:inherit;color:#4a6080;background:transparent" id="ps-pero-blank-name-'+bi+'"/></td>'
+      +'<td style="padding:4px 5px"><input placeholder="Code" data-bi="'+bi+'" data-field="code" style="width:52px;padding:2px 3px;border:1px solid #e5eaf2;border-radius:4px;font-size:10.5px;font-family:inherit;color:#8a9ab8" id="ps-pero-blank-code-'+bi+'"/></td>'
+      +'<td style="padding:4px 5px;text-align:right"><input type="number" placeholder="Ac" style="width:52px;padding:2px 3px;border:1px solid #e5eaf2;border-radius:4px;font-size:10.5px;text-align:right;font-family:inherit" id="ps-pero-blank-avail-'+bi+'"/></td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;border-left:2px solid #e5eaf2;border-right:2px solid #e5eaf2;background:#f8fafc">—</td>'
+      +bCells3
+      +'<td style="padding:3px;position:sticky;right:0;background:#fafbfe"><button data-bi="'+bi+'" data-tab="'+psActiveTab+'" onclick="psSaveBlankRowBtn(this)" style="color:'+col+';background:none;border:none;cursor:pointer;font-size:11px;padding:2px 5px" title="Save row">💾</button></td>'
+      +'</tr>';
+  }
+
+    // Contract section
+  var contractRows = contractFarms.map(function(x){ return renderFarmRow(x.f, x.i, true); }).join('');
+  var growerOptions='<option value="">— Select Grower —</option>'
+    +growers.map(function(g){return '<option value="'+g.id+'">'+esc(g.name)+'</option>';}).join('');
+
+  // 10 blank Contract rows
+  var contractBlank='';
+  for(var bi=0;bi<10;bi++){
+    var bCells4=psDates.map(function(d,wi){
+      return '<td style="padding:2px;text-align:center"><input type="number" step="0.1" placeholder="" min="0" style="width:60px;padding:3px 5px;border:1px solid #eee;border-radius:5px;font-size:11.5px;text-align:center;background:#f8fafc;font-family:inherit"/></td>';
+    }).join('');
+    contractBlank+='<tr style="border-bottom:1px solid #f5f7fa">'
+      +'<td style="padding:4px 8px;position:sticky;left:0;background:#f8fafc;z-index:1;border-right:1px solid #e5eaf2"><select data-bi="'+bi+'" data-tab="'+psActiveTab+'" style="width:100%;padding:3px 5px;border:1px solid #dde4ee;border-radius:5px;font-size:11.5px;color:#4a6080;font-family:inherit" onchange="psAssignContractGrowerBtn(this)">'+growerOptions+'</select></td>'
+      +'<td style="padding:4px 5px"><input placeholder="Code" style="width:52px;padding:2px 3px;border:1px solid #e5eaf2;border-radius:4px;font-size:10.5px;font-family:inherit;color:#8a9ab8"/></td>'
+      +'<td style="padding:4px 5px;text-align:right"><input type="number" placeholder="Ac" style="width:52px;padding:2px 3px;border:1px solid #e5eaf2;border-radius:4px;font-size:10.5px;text-align:right;font-family:inherit"/></td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;font-size:11px">—</td>'
+      +'<td style="padding:4px 8px;color:#c0cad8;text-align:right;border-left:2px solid #e5eaf2;border-right:2px solid #e5eaf2;background:#f8fafc">—</td>'
+      +bCells4
+      +'<td style="position:sticky;right:0;background:#f8fafc"></td>'
+      +'</tr>';
+  }
+
+    // ── Read-only rows sourced from grower planting records ──────────
+  // Filter plantings matching active season, commodity, build display rows
+  var plantingRecordRows = '';
+  var prFarms = [];
+  growers.forEach(function(g){
+    g.plantings.forEach(function(p){
+      if(p.season !== psActiveSeason) return;
+      var pComm = psActiveTab==='conventional' ? 'Green Beans' : 'Organic Green Beans';
+      if(p.commodity !== pComm) return;
+      // Find which harvest week this planting belongs to
+      var harvestDate = '';
+      var li = p.inspections && p.inspections[p.inspections.length-1];
+      if(li && li.bloomDate){var bd=new Date(li.bloomDate+'T12:00:00');bd.setDate(bd.getDate()+21);harvestDate=bd.toISOString().slice(0,10);}
+      else if(p.datePlanting&&p.daysToHarvest){var pd=new Date(p.datePlanting+'T12:00:00');pd.setDate(pd.getDate()+parseInt(p.daysToHarvest));harvestDate=pd.toISOString().slice(0,10);}
+      if(!harvestDate) return;
+      // Find week index in psDates
+      var wi = psDates.indexOf(harvestDate);
+      if(wi<0){
+        // find closest Sunday
+        for(var i=0;i<psDates.length;i++){
+          if(psDates[i]>=harvestDate){wi=i;break;}
+        }
+      }
+      if(wi<0) return;
+      // Build a display-only row
+      var acres = parseFloat(p.acres)||0;
+      var wkCells2 = psDates.map(function(d,wii){
+        var v = wii===wi ? acres : 0;
+        return '<td style="padding:2px 2px;text-align:center;font-size:11.5px;color:'+(v>0?col:'#c0cad8')+'">'+(v>0?v:'—')+'</td>';
+      }).join('');
+      var farmTotal2 = acres;
+      var avail2 = parseFloat(p.acres)||0;
+      var crop2_2 = avail2*2;
+      var bal2 = 0; var bal22 = 0;
+      plantingRecordRows += '<tr style="border-bottom:1px solid #f0f4f9;background:#f8fff8">'
+        +'<td style="padding:4px 8px;min-width:180px;position:sticky;left:0;background:#f8fff8;z-index:1;border-right:1px solid #e5eaf2;font-size:11.5px;font-weight:600;color:#1a4a28">'+esc(g.name)+'<div style="font-size:9.5px;font-weight:400;color:#8a9ab8">'+esc(p.farmId||'')+(p.fieldSection?' · Sec '+esc(p.fieldSection):'')+'</div></td>'
+        +'<td style="padding:4px 5px;font-size:10px;color:#8a9ab8">'+esc(p.farmId||p.fieldLocation||'')+'</td>'
+        +'<td style="padding:4px 5px;text-align:right;font-size:11.5px;font-weight:600;color:'+col+'">'+avail2+'</td>'
+        +'<td style="padding:4px 5px;text-align:right;font-size:11.5px;color:#1a4a28">'+crop2_2+'</td>'
+        +'<td style="padding:4px 8px;text-align:right;font-size:11.5px;color:#8a9ab8">—</td>'
+        +'<td style="padding:4px 8px;text-align:right;font-size:11.5px;color:#8a9ab8">—</td>'
+        +'<td style="padding:4px 8px;font-weight:700;color:'+col+';text-align:right;border-left:2px solid '+col+'20;border-right:2px solid '+col+'20;background:#f0f8f0">'+farmTotal2+'</td>'
+        +wkCells2
+        +'<td style="padding:3px;text-align:center;position:sticky;right:0"><a data-gid="'+g.id+'" onclick="navigate(\'growers\',this.dataset.gid)" style="font-size:10px;color:#1a5090;cursor:pointer;text-decoration:underline">View</a></td>'
+        +'</tr>';
+    });
+  });
+
+  var plantingRecordsSection = plantingRecordRows
+    ? sectionBanner('📋 From Planting Records (Season: '+psActiveSeason+')', '#1a4a28', '#fff') + plantingRecordRows
+    : '';
+
+  // Assemble all sections
+  var farmRows = ''
+    + sectionBanner('🏢 Pero Growers — Florida', col, '#fff')
+    + peroRows
+    + peroBlank
+    + sectionTotalRow('Pero Growers', farms.filter(function(f){return f.section!=='contract';}), '#e8f2fd', col)
+    + sectionBanner('📋 Contract Growers', '#4a2a00', '#fff')
+    + contractRows
+    + contractBlank
+    + sectionTotalRow('Contract Growers', farms.filter(function(f){return f.section==='contract';}), '#fef9e6', '#8a6000')
+    + plantingRecordsSection;
+
+  function summaryRow(label, vals, vColor, bgColor, fmt, isTot){
+    // For dark bg rows (1a2332), use white text for label
+    var lblColor = bgColor==='#1a2332'?'#fff':vColor;
+    var lblBg = bgColor;
+    var cells=vals.map(function(v){
+      return '<td style="padding:5px 3px;text-align:center;font-weight:700;color:'+vColor+';font-size:11.5px">'+(v>0?fmt(v):'—')+'</td>';
+    }).join('');
+    var tot=vals.reduce(function(s,v){return s+v;},0);
+    return '<tr style="background:'+bgColor+';border-top:'+(isTot?'2':'1')+'px solid '+vColor+'30">'
+      +'<td colspan="3" style="padding:6px 10px;font-weight:700;font-size:12px;color:'+vColor+';position:sticky;left:0;background:'+bgColor+';border-right:1px solid #e5eaf2">'+label+'</td>'
+      +cells
+      +'<td style="font-weight:800;color:'+vColor+';padding:6px 8px;text-align:right;position:sticky;right:36px;background:'+bgColor+';border-left:1px solid #e5eaf2">'+fmt(tot)+'</td>'
+      +'<td style="position:sticky;right:0;background:'+bgColor+'"></td></tr>';
+  }
+
+  var diffCells=weekLbs.map(function(lbs,wi){
+    var dem=weekDemand[wi];
+    if(!lbs&&!dem) return '<td style="padding:5px 3px;text-align:center;color:#c0cad8">—</td>';
+    var diff=lbs-dem;
+    var c2=diff>=0?'#1a7a40':'#b03030';
+    return '<td style="padding:5px 3px;text-align:center;font-weight:700;font-size:11.5px;color:'+c2+'">'+(diff>=0?'+':'')+Math.round(diff/1000)+'K</td>';
+  }).join('');
+  var diffBg=totalDiff>=0?'#f0f8f0':'#fff5f5';
+  var diffRow='<tr style="background:'+diffBg+'">'
+    +'<td colspan="6" style="padding:6px 10px;font-weight:700;font-size:12px;color:'+dcol+';position:sticky;left:0;background:'+diffBg+';border-right:1px solid #e5eaf2">'+(totalDiff>=0?'▲ SURPLUS':'▼ SHORTFALL')+' vs Demand</td>'
+    +'<td style="font-weight:800;color:'+dcol+';padding:6px 8px;text-align:right;background:'+diffBg+';border-left:2px solid '+dcol+'20;border-right:2px solid '+dcol+'20">'+(totalDiff>=0?'+':'')+Math.round(totalDiff/1000)+'K</td>'
+    +diffCells
+    +'<td style="position:sticky;right:0;background:'+diffBg+'"></td></tr>';
+
+  // Per-section totals
+  var peroWeekAcres=psDates.map(function(d,wi){
+    return farms.filter(function(f){return f.section!=='contract';}).reduce(function(s,f){return s+(parseFloat(f.acres[wi])||0);},0);
+  });
+  var contractWeekAcres=psDates.map(function(d,wi){
+    return farms.filter(function(f){return f.section==='contract';}).reduce(function(s,f){return s+(parseFloat(f.acres[wi])||0);},0);
+  });
+  var peroWeekLbs=peroWeekAcres.map(function(ac,wi){return ac>0?(Math.round(ac*(wkYields[wi]||0)*28)):0;});
+  var contractWeekLbs=contractWeekAcres.map(function(ac,wi){return ac>0?(Math.round(ac*(wkYields[wi]||0)*28)):0;});
+
+  var tfoot=summaryRow('🏢 PERO GROWERS ACRES',peroWeekAcres,col,lc,function(v){return v>0?v.toLocaleString():'—';},true)
+    +summaryRow('🏢 PERO GROWERS LBS',peroWeekLbs,'#1a7a40','#f0f8f0',function(v){return v>0?(v/1000).toFixed(0)+'K':'—';},false)
+    +summaryRow('📋 CONTRACT GROWERS ACRES',contractWeekAcres,'#8a6000','#fef9e6',function(v){return v>0?v.toLocaleString():'—';},false)
+    +summaryRow('📋 CONTRACT GROWERS LBS',contractWeekLbs,'#7a5000','#fef3d0',function(v){return v>0?(v/1000).toFixed(0)+'K':'—';},false)
+    +summaryRow('⬛ GRAND TOTAL ACRES',weekAcres,'#fff','#1a2332',function(v){return v>0?v.toLocaleString():'—';},true)
+    +summaryRow('⬛ GRAND TOTAL LBS',weekLbs,'#1a7a40','#f0f8f0',function(v){return v>0?(v/1000).toFixed(0)+'K':'—';},false)
+    +summaryRow('⬛ GRAND TOTAL BINS (÷500)',weekLbs.map(function(l){return l?Math.ceil(l/500):0;}),'#5a8a60','#e8f8ee',function(v){return v>0?v.toLocaleString():'—';},false)
+    +summaryRow('📊 DEMAND (from demand plan)',weekDemand,'#1a5090','#e8f2fd',function(v){return v>0?(v/1000).toFixed(0)+'K':'—';},false)
+    +diffRow;
+
+  return '<div class="page-header" style="margin-bottom:14px"><h2>Planting Schedule</h2><p>Interactive harvest schedule by farm · edit acres per week · lbs and bins calculated automatically</p></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:18px">'+tabs+'</div>'
+    +seasonBar+statCards+yieldBar
+    +'<div class="card"><div class="card-header">'
+    +'<span class="card-title">'+(psActiveTab==='conventional'?'🌾 Conventional':'🌿 Organic')+' Green Beans — Acres per Farm per Harvest Week</span>'
+    +'<span style="font-size:11px;color:#8a9ab8">Click any cell to edit acres · saves automatically</span>'
+    +'</div><div style="overflow:auto;max-height:65vh">'
+    +'<table style="border-collapse:collapse;width:100%"><thead><tr style="position:sticky;top:0;z-index:2;background:#f8fafc">'
+    +'<th style="position:sticky;left:0;z-index:3;background:#f8fafc;padding:7px 10px;text-align:left;min-width:180px;border-bottom:2px solid '+col+'40;border-right:1px solid #e5eaf2;font-size:11px">Farm Name</th>'
+    +'<th style="padding:7px 5px;font-size:9.5px;border-bottom:2px solid '+col+'40">Code</th>'
+    +'<th style="padding:7px 5px;font-size:9.5px;text-align:right;border-bottom:2px solid '+col+'40">Avail</th>'
+    +'<th style="padding:7px 5px;font-size:9.5px;text-align:right;border-bottom:2px solid '+col+'40;color:#1a4a28">2nd Crop<div style="font-weight:400;color:#8a9ab8;font-size:8.5px">Avail × 2</div></th>'
+    +'<th style="padding:7px 5px;font-size:9.5px;text-align:right;border-bottom:2px solid '+col+'40;color:#1a7a40">Balance</th>'
+    +'<th style="padding:7px 5px;font-size:9.5px;text-align:right;border-bottom:2px solid '+col+'40;color:#1a4a28">Bal. 2nd</th>'
+    +'<th style="padding:7px 6px;font-size:9.5px;text-align:right;border-bottom:2px solid '+col+'40;border-left:2px solid '+col+'20;border-right:2px solid '+col+'20;background:#f8fafc">Total Ac</th>'
+    +wkHdr
+    +'<th style="position:sticky;right:0;background:#f8fafc;border-bottom:2px solid '+col+'40;min-width:30px"></th>'
+    +'</tr></thead><tbody>'+farmRows+'</tbody><tfoot>'+tfoot+'</tfoot></table></div></div>';
+}
+
+function psUpdateDate(wi,val){
+  if(!val) return;
+  // Snap to Monday
+  var dt=new Date(val+'T12:00:00');
+  var day=dt.getDay(); // 0=Sun,1=Mon...
+  var diff=day===1?0:day===0?1:(8-day);
+  if(diff>0) dt.setDate(dt.getDate()+diff);
+  // Also try going back to Monday
+  var dt2=new Date(val+'T12:00:00');
+  var d2=dt2.getDay();
+  var back=d2===1?0:d2===0?-6:1-d2;
+  dt2.setDate(dt2.getDate()+back);
+  var mon=dt2.toISOString().slice(0,10);
+  psDates[wi]=mon;
+  psSave();
+  clearTimeout(window._psT);window._psT=setTimeout(function(){renderContent();},700);
+}
+
+function psUpdateFarmField(type,fi,field,val){
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  if(farms[fi]) farms[fi][field]=val;
+  psSave();
+  // Don't re-render on every keystroke — just save
+}
+function psAddBlankRow(section,bi,wi,val,el,col,lc){
+  var v=parseFloat(val)||0;
+  el.style.background=v>0?lc:'#fafbfe';
+  // Stored temporarily in DOM; psSaveBlankRow commits it
+}
+function psBlankAcreChange(el){
+  var v=parseFloat(el.value)||0;
+  el.style.background=v>0?'#e8f2fd':'#fafbfe';
+}
+function psSaveBlankRowBtn(btn){
+  var bi=parseInt(btn.dataset.bi);
+  var type=btn.dataset.tab;
+  psSaveBlankRow('pero',bi,type);
+}
+function psAssignContractGrowerBtn(sel){
+  var bi=parseInt(sel.dataset.bi);
+  var type=sel.dataset.tab;
+  psAssignContractGrower(type,bi,sel.value);
+}
+function psSaveBlankRow(section,bi,type){
+  var nameEl=document.getElementById('ps-'+section+'-blank-name-'+bi);
+  var codeEl=document.getElementById('ps-'+section+'-blank-code-'+bi);
+  var availEl=document.getElementById('ps-'+section+'-blank-avail-'+bi);
+  var name=(nameEl&&nameEl.value.trim())||'';
+  if(!name){showToast('Enter a farm name first','error');return;}
+  var code=(codeEl&&codeEl.value.trim())||'';
+  var avail=parseFloat(availEl&&availEl.value)||0;
+  // Collect acre inputs from the row
+  var acres=[];
+  var row=nameEl&&nameEl.closest('tr');
+  if(row){
+    var inputs=row.querySelectorAll('input[type="number"]');
+    inputs.forEach(function(inp,i){if(i>0||availEl!==inp) acres.push(parseFloat(inp.value)||0);});
+    // Fix: just make empty array the right length
+  }
+  while(acres.length<psDates.length) acres.push(0);
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  farms.push({name:name,code:code,avail:avail,acres:acres.slice(0,psDates.length),section:section==='contract'?'contract':'pero'});
+  psSave();renderContent();
+}
+function psAssignContractGrower(type,bi,growerId){
+  if(!growerId) return;
+  var g=growers.find(function(gr){return gr.id===growerId;});
+  if(!g) return;
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  farms.push({name:g.name,code:g.phone||'',avail:0,acres:new Array(psDates.length).fill(0),section:'contract',growerId:growerId});
+  psSave();renderContent();
+}
+function psAssignBlankFarm(type,blankIdx,growerId){
+  if(!growerId) return;
+  var g=growers.find(function(gr){return gr.id===growerId;});
+  if(!g) return;
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  // Add as a proper farm row
+  var N=psDates.length;
+  farms.push({name:g.name, code:g.phone||'', avail:0, acres:new Array(N).fill(0), growerId:growerId});
+  psSave();renderContent();
+}
+function psUpdateBlankAcre(type,bi,wi,val,el,col,lc){
+  // Blank rows track into a temporary buffer; once grower is assigned they become real rows
+  // For now just highlight the cell
+  var v=parseFloat(val)||0;
+  el.style.background=v>0?lc:'#fafbfe';
+}
+function psUpdateDTH(wi,val){
+  var v=parseInt(val)||55;
+  psDaysToHarvest[wi]=v;
+  psSave();
+  clearTimeout(window._psT);window._psT=setTimeout(function(){renderContent();},700);
+}
+function psUpdateWeekYield(wi,val){
+  var v=parseFloat(val)||0;
+  var yields=psActiveTab==='conventional'?psConvYields:psOrgYields;
+  yields[wi]=v;
+  psSave();
+  clearTimeout(window._psT);window._psT=setTimeout(function(){renderContent();},700);
+}
+
+function psSetAllYields(){
+  var cur=psActiveTab==='conventional'?psConvYields[0]:psOrgYields[0];
+  var val=prompt('Set yield (cartons/ac) for ALL weeks on '+psActiveTab+' schedule:',cur||150);
+  if(!val||!val.trim()) return;
+  var v=parseFloat(val)||150;
+  var yields=psActiveTab==='conventional'?psConvYields:psOrgYields;
+  for(var i=0;i<psDates.length;i++) yields[i]=v;
+  psSave();renderContent();
+}
+
+function psAddWeek(){
+  var lastDate=psDates[psDates.length-1];
+  var dt=new Date(lastDate+'T12:00:00');
+  dt.setDate(dt.getDate()+7);
+  var newDate=dt.toISOString().slice(0,10);
+  psDates.push(newDate);
+  psDaysToHarvest.push(55);
+  psConvYields.push(150);
+  psOrgYields.push(180);
+  psConvFarms.forEach(function(f){f.acres.push(0);});
+  psOrgFarms.forEach(function(f){f.acres.push(0);});
+  psSave();renderContent();
+}
+
+function psUpdateAcre(type,fi,wi,val,el,col,lc){
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  var v=parseFloat(val)||0;
+  farms[fi].acres[wi]=v;
+  el.style.background=v>0?lc:'#fff';
+  psSave();
+  clearTimeout(window._psT);
+  window._psT=setTimeout(function(){renderContent();},700);
+}
+// psSaveYield replaced by psUpdateWeekYield
+function psAddFarm(){
+  var name=prompt('Farm name:');if(!name||!name.trim())return;
+  var code=prompt('Farm code (optional):')||'';
+  var avail=parseFloat(prompt('Available acres (optional):')||'0')||0;
+  var farms=psActiveTab==='conventional'?psConvFarms:psOrgFarms;
+  farms.push({name:name.trim(),code:code.trim(),avail:avail,acres:new Array(psDates.length).fill(0)});
+  psSave();renderContent();
+}
+function psRemoveFarm(type,idx){
+  if(!confirm('Remove this farm from the schedule?'))return;
+  var farms=type==='conventional'?psConvFarms:psOrgFarms;
+  farms.splice(idx,1);psSave();renderContent();
+}
+function psClearAllAcres(){
+  var tab = psActiveTab==='conventional'?'Conventional':'Organic';
+  if(!confirm('Clear ALL acres for '+tab+' Green Beans ('+psActiveSeason+')? This will zero every acre input for every farm in this season. This cannot be undone.')) return;
+  var farms = psActiveTab==='conventional' ? psConvFarms : psOrgFarms;
+  farms.forEach(function(f){
+    f.acres = new Array(psDates.length).fill(0);
+  });
+  psSave();
+  showToast('All '+tab+' acres cleared for '+psActiveSeason,'info');
+  renderContent();
+}
+
+function psResetSchedule(){
+  if(!confirm('Reset to original spreadsheet data? This will overwrite all changes for '+(psActiveTab==='conventional'?'Conventional':'Organic')+', including dates and yields.'))return;
+  if(psActiveTab==='conventional'){
+    psConvFarms=JSON.parse(JSON.stringify(PS_DEFAULT_CONV));
+    psConvYields=new Array(PS_HARVEST_DATES.length).fill(150);
+  } else {
+    psOrgFarms=JSON.parse(JSON.stringify(PS_DEFAULT_ORG));
+    psOrgYields=new Array(PS_HARVEST_DATES.length).fill(180);
+  }
+  psDates=PS_HARVEST_DATES.slice();
+  psDaysToHarvest=new Array(PS_HARVEST_DATES.length).fill(55);
+  psSave();renderContent();
+}
+
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+loadStandaloneData();
+renderContent();
+</script>
+</body>
+</html>
